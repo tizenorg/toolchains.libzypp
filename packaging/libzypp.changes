@@ -1,0 +1,146 @@
+* Fri Jul 22 2011 Zhang Qiang <qiang.z.zhang@intel.com> - 9.8.3
+- Add meego-try-again-while-downloading-fails.patch to fix BMC#21712 
+
+* Thu Jul  7 2011 Zhang Qiang <qiang.z.zhang@intel.com> - 9.8.3
+- no_proxy support for individual repo
+
+* Wed Jul 06 2011 Anas Nashif <anas.nashif@intel.com> - 9.8.3
+- Temporary fix for bmc #19659: Architecture is not being set correctly
+
+* Tue Jul 05 2011 Anas Nashif <anas.nashif@intel.com> - 9.8.3
+- Update to 9.8.3
+
+* Tue Jun 07 2011 Jan-Simon Möller <jsmoeller@linuxfoundation.org> - 9.1.2
+- Readd thumb arch names
+
+* Mon May 23 2011 Anas Nashif <anas.nashif@intel.com> - 9.1.2
+- Update to 9.1.2 with support for rpm 4.9.0
+
+* Wed May 18 2011 Jan-Simon Möller <jsmoeller@linuxfoundation.org> - 8.12.1
+- Add missing const Arch Arch_armv* entries. BMC#12930 .
+
+* Fri Apr 29 2011 Zhang Qiang <qiang.z.zhang@intel.com> - 8.12.1
+- Update MeeGo-use-fullname-in-search_deltafile.patch to fix BMC#14928
+- Add 0001-Fix-build-with-alternative-libproxy-implementations-.patch
+  to building with libproxy support, fix BMC#16869
+
+* Tue Apr 19 2011 Zhang Qiang <qiang.z.zhang@intel.com> - 8.12.1
+- Update to 8.12.1, and drop patches already in upstream.
+
+* Mon Mar 21 2011 Zhang Qiang <qiang.z.zhang@intel.com> - 8.10.2
+- Update libzypp-6.29.2-meego.patch to update the multiversion
+  package name with the current kernel names, fix BMC#14746
+
+* Wed Mar 16 2011 Zhang Qiang <qiang.z.zhang@intel.com> - 8.10.2
+- Add MeeGo-use-fullname-in-search_deltafile.patch to use full name
+  while search delta file. Fix BMC#14209.
+- Add MeeGo-Add-Rpm-Checker.patch to check signature of rpm packages
+  before installing packages, and FileCheckerException is throw and 
+  details is controlled by PackageKit. This patch is necessary to fix
+  BMC#3622.
+
+* Wed Mar  2 2011 Zhang Qiang <qiang.z.zhang@intel.com> - 8.10.2
+- Update MeeGo-resume-download.patch to let single curl support resume.
+- MeeGo-dont-use-multcurl-by-default.patch to use single curl download
+  by default, as percentage progress is not supported well in multcurl
+  fix BMC#13980
+
+* Wed Feb 02 2011 Marko Saukko <marko.saukko@cybercom.com> - 8.10.2
+- Added patch for armv7tnhl and armv7thl support. BMC#12624
+
+* Thu Dec 30 2010 Zhang Qiang <qiang.z.zhang@intel.com> - 8.10.2
+- Update MeeGo-resume-download.patch to resolve issue when installing 
+  local rpm, fix BMC#11827.
+
+* Wed Dec 22 2010 Zhang Qiang <qiang.z.zhang@intel.com> - 8.10.2
+- Update to 8.10.2, and drop patches already in upstream. BMC#11604
+- Add MeeGo-support-none-proxy-from-repo.patch to fix a bug in 
+  using none proxy, without this patch, zypper cant use env proxy.
+
+* Tue Dec 21 2010 Zhang Qiang <qiang.z.zhang@intel.com> - 8.1.0
+- Update MeeGo-Add-armv7hl-and-armv7nhl-architecture.patch to fix
+  the compatible issue, fix BMC#11484.
+
+* Mon Dec 20 2010 Zhang Qiang <qiang.z.zhang@intel.com> - 8.1.0
+- Add MeeGo-resume-download.patch to support resume/re-start 
+  download packages, this patch can support to implement FEA#9355
+- Add MeeGo-Add-armv7hl-and-armv7nhl-architecture.patch to support 
+  two arm architecture, fix BMC#11484
+
+* Sat Nov  6 2010 Zhang Qiang <qiang.z.zhang@intel.com> - 8.1.0
+- Add a patch meego-check-products-dir-while-using-rpmdb2solv.patch
+  to check the products dir (/etc/products.d) while using rpmdb2solv
+  to create rpmdb solv file, fix BMC#9099
+- Update meego-enable-proxy.patch, to add removeQueryParam() in class
+  Url, which can used to remove proxy Param while it's useless. 
+  also use regex to parse the proxy info in repo file
+
+* Mon Sep 13 2010 Zhang Qiang <qiang.z.zhang@intel.com> - 8.1.0
+- Add a patch to implement enable/disable proxy for special repo
+  just as we used in yum repo file, fix BMC#6614.
+
+* Mon Sep 06 2010 Anas Nashif <nashif@linux.intel.com> - 8.1.0
+- Fixed bug #5599: Use gpg2 instead of gpg to verify keys
+
+* Sat Sep 04 2010 Anas Nashif <nashif@linux.intel.com> - 8.1.0
+- Depend on gnupg2
+- Do not depend on aria2 anymore, we use curl
+
+* Mon Aug 23 2010 Zhang Qiang <qiang.z.zhang@intel.com> - 8.1.0
+- Update to 8.1.0
+
+* Tue Aug 17 2010 Peter J Zhu <peter.j.zhu@intel.com> - 7.7.2
+- revert to depend on gnupg again, workround for BMC#5283
+
+* Mon Aug  9 2010 Yan Li <yan.i.li@intel.com> - 7.7.2
+- Replace gnupg with gnupg2
+
+* Thu Jun 17 2010 Anas Nashif <anas.nashif@intel.com> - 7.7.2
+- Update to version 7.7.2
+
+* Sun Apr 28 2010 Michael Meek <michael.meeks@novell.com> - 6.31.0
+- Add patch to workaround an infinite sized log blow-out.
+
+* Sun Mar 21 2010 Anas Nashif <anas.nashif@intel.com> - 6.31.0
+- Update to 6.31.0
+
+* Tue Mar 16 2010 michael.meeks@novell.com - 6.30.4
+- remove bogus C++ workaround, was a prelink bug - cf. prelink patch.
+
+* Tue Mar 16 2010 Anas Nashif <anas.nashif@intel.com> - 6.30.4
+- Exclude from prelink
+
+* Sat Mar 13 2010 michael.meeks@novell.com - 6.30.4
+- Work around a C++ compiler bug - bogus non-functioning 'private'
+
+* Sat Mar 06 2010 Anas Nashif <anas.nashif@intel.com> - 6.30.4
+- Update to 6.30.4
+- Remove upstreamed patches
+
+* Fri Feb 26 2010 Anas Nashif <anas.nashif@intel.com> - 6.29.4
+- Update tp 6.29.4
+- libzypp-do_not_rebuild_db.patch: Do not rebuild database
+
+* Wed Feb 17 2010 Anas Nashif <anas.nashif@intel.com> - 6.29.2
+- Update to 6.29.2
+
+* Fri Jan 22 2010 Anas Nashif <anas.nashif@intel.com> - 6.21.2
+- Do not install package-manager app
+
+* Tue Jan 19 2010 Peter Zhu <peter.j.zhu@intel.com> - 6.21.2
+- Update to 6.21.2
+
+* Tue Nov 17 2009 Peter Zhu <peter.j.zhu@intel.com> - 6.17.0
+- disable hal of libzypp we don't need support DVD/CD repo in Moblin
+
+* Mon Oct 05 2009 Anas Nashif <anas.nashif@intel.com> - 6.17.0
+- Cleanup spec file
+
+* Wed Sep 30 2009 Anas Nashif <anas.nashif@intel.com> - 6.17.0
+- Remove suse specific macro
+
+* Wed Sep 30 2009 Anas Nashif <anas.nashif@intel.com> - 6.17.0
+- Moblin specific config
+
+* Tue Sep 29 2009 Anas Nashif <anas.nashif@intel.com> - 6.17.0
+- Update to 6.17.0
