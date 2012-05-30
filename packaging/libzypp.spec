@@ -9,6 +9,7 @@ Release:        1
 Source:         %{name}-%{version}.tar.bz2
 Source1:        %{name}-rpmlintrc
 Source2:        libzypp.conf
+Source1001: packaging/libzypp.manifest 
 BuildRequires:  cmake
 BuildRequires:  libudev-devel
 BuildRequires:  libsatsolver-devel >= 0.14.9
@@ -98,6 +99,7 @@ Authors:
 %patch17 -p1
 
 %build
+cp %{SOURCE1001} .
 mkdir build
 cd build
 export CFLAGS="$RPM_OPT_FLAGS"
@@ -203,6 +205,7 @@ fi
 rm -rf "$RPM_BUILD_ROOT"
 
 %files -f zypp.lang
+%manifest libzypp.manifest
 %defattr(-,root,root,-)
 %dir /etc/zypp
 %dir /etc/zypp/repos.d
@@ -221,9 +224,9 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/libzypp*so.*
 
 %files devel
+%manifest libzypp.manifest
 %defattr(-,root,root,-)
 %{_libdir}/libzypp.so
 %dir /usr/include/zypp
 /usr/include/zypp/*
-/usr/share/cmake/Modules/*
-%{_libdir}/pkgconfig/libzypp.pc
+%{_libdir}/pkgconfig/libzypp.pc/usr/share/cmake/Modules/*
