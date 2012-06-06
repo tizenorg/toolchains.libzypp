@@ -229,4 +229,5 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/libzypp.so
 %dir /usr/include/zypp
 /usr/include/zypp/*
-%{_libdir}/pkgconfig/libzypp.pc/usr/share/cmake/Modules/*
+%{_libdir}/pkgconfig/libzypp.pc
+/usr/share/cmake/Modules/*
