@@ -1,0 +1,27 @@
+Index: libzypp-9.8.3/CMakeLists.txt
+===================================================================
+--- libzypp-9.8.3.orig/CMakeLists.txt
++++ libzypp-9.8.3/CMakeLists.txt
+@@ -160,12 +160,6 @@ ELSE ( NOT LIBPROXY_FOUND )
+   ADD_DEFINITIONS(-D_WITH_LIBPROXY_SUPPORT_)
+ ENDIF( NOT LIBPROXY_FOUND )
+ 
+-FIND_PROGRAM( DOXYGEN doxygen )
+-IF ( NOT DOXYGEN )
+-  MESSAGE( FATAL_ERROR "doxygen not found: install doxygen to build the documentation." )
+-ELSE ( NOT DOXYGEN )
+-  MESSAGE( STATUS "doxygen found: ${DOXYGEN}" )
+-ENDIF ( NOT DOXYGEN )
+ 
+ MESSAGE(STATUS "soname: ${LIBZYPP_VERSION_INFO}")
+ MESSAGE(STATUS "version: ${VERSION}")
+@@ -204,9 +198,5 @@ ADD_SUBDIRECTORY( devel EXCLUDE_FROM_ALL
+ ADD_SUBDIRECTORY( tools )
+ ADD_SUBDIRECTORY( examples )
+ ADD_SUBDIRECTORY( po EXCLUDE_FROM_ALL )
+-ADD_SUBDIRECTORY( doc )
+ ADD_SUBDIRECTORY( vendor )
+-ADD_SUBDIRECTORY( tests EXCLUDE_FROM_ALL )
+ 
+-INCLUDE(CTest)
+-ENABLE_TESTING()
