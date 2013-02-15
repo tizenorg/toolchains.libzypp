@@ -1,0 +1,31 @@
+diff -uNr libzypp-8.12.1/zypp/repo/yum/Downloader.cc libzypp-8.12.1.new/zypp/repo/yum/Downloader.cc
+--- libzypp-8.12.1/zypp/repo/yum/Downloader.cc	2011-02-14 21:47:33.000000000 +0800
++++ libzypp-8.12.1.new/zypp/repo/yum/Downloader.cc	2011-04-29 11:42:03.477581524 +0800
+@@ -64,9 +64,6 @@
+   if (!PathInfo(dir).isDir())
+     return deltafile;
+   string base = file.basename();
+-  size_t hypoff = base.find("-");
+-  if (hypoff != string::npos)
+-    base.replace(0, hypoff + 1, "");
+   size_t basesize = base.size();
+   std::list<Pathname> retlist;
+   if (!filesystem::readdir(retlist, dir, false))
+@@ -86,7 +83,7 @@
+ {
+   OnMediaLocation loc_with_path(loc_with_path_prefix(loc, repoInfo().path()));
+   MIL << id << " : " << loc_with_path << endl;
+-  this->enqueueDigested(loc_with_path,  FileChecker(), search_deltafile(_delta_dir + "repodata", loc.filename()));
++  this->enqueueDigested(loc_with_path,  FileChecker());
+   return true;
+ }
+ 
+@@ -110,7 +107,7 @@
+     return true;
+   }
+ 
+-  this->enqueueDigested(loc_with_path, FileChecker(), search_deltafile(_delta_dir + "repodata", loc.filename()));
++  this->enqueueDigested(loc_with_path, FileChecker());
+ 
+   // We got a patches file we need to read, to add patches listed
+   // there, so we transfer what we have in the queue, and
