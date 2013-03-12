@@ -1,0 +1,12 @@
+diff -uNr libzypp-8.10.2/zypp/media/MediaAccess.cc libzypp-8.10.2.new/zypp/media/MediaAccess.cc
+--- libzypp-8.10.2/zypp/media/MediaAccess.cc	2010-12-11 01:09:04.000000000 +0800
++++ libzypp-8.10.2.new/zypp/media/MediaAccess.cc	2011-03-02 14:12:42.530519100 +0800
+@@ -137,7 +137,7 @@
+     {
+         // Another good idea would be activate MediaAria2c handler via external var
+         bool use_aria = false;
+-        bool use_multicurl = true;
++        bool use_multicurl = false;
+         string urlmediahandler ( url.getQueryParam("mediahandler") );
+         if ( urlmediahandler == "multicurl" )
+         {

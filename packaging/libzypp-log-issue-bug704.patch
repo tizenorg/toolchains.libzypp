@@ -1,0 +1,15 @@
+diff --git a/zypp/KeyRing.cc b/zypp/KeyRing.cc
+index 44d253a..cafd1e4 100644
+--- a/zypp/KeyRing.cc
++++ b/zypp/KeyRing.cc
+@@ -613,7 +613,9 @@ namespace zypp
+ 
+     str::regex rxNoKey("^\\[GNUPG:\\] NO_PUBKEY (.+)\n$");
+     string id;
+-    for(line = prog.receiveLine(), count=0; !line.empty(); line = prog.receiveLine(), count++ )
++    for(line = prog.receiveLine(), count=0;
++	!line.empty() && id.empty() && count < 100;
++	line = prog.receiveLine(), count++ )
+     {
+       //MIL << "[" << line << "]" << endl;
+       str::smatch what;
