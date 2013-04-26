@@ -28,17 +28,18 @@ Requires:       satsolver-tools
 
 Patch0: 	libzypp-6.29.2-meego.patch
 Patch1: 	libzypp-log-issue-bug704.patch
-Patch2:         libzypp-meego-release.patch
+Patch2:     libzypp-meego-release.patch
 Patch3:		use_gpg2.patch
-Patch5:         meego-check-products-dir-while-using-rpmdb2solv.patch
-Patch6:         MeeGo-resume-download.patch
-Patch10:        MeeGo-dont-use-multcurl-by-default.patch
-Patch11:        MeeGo-Add-Rpm-Checker.patch
-Patch12:        MeeGo-use-fullname-in-search_deltafile.patch
-Patch13:        MeeGo-patch-readd-thumb-arch-definitions.patch
-Patch14:        linker.patch
+Patch4:		uuidgen.patch
+Patch5:     meego-check-products-dir-while-using-rpmdb2solv.patch
+Patch6:     MeeGo-resume-download.patch
+Patch10:    MeeGo-dont-use-multcurl-by-default.patch
+Patch11:    MeeGo-Add-Rpm-Checker.patch
+Patch12:    MeeGo-use-fullname-in-search_deltafile.patch
+Patch13:    MeeGo-patch-readd-thumb-arch-definitions.patch
+Patch14:    linker.patch
 Patch15:	0001-Disable-proxy-only-if-_none_-is-set-in-repo-file.patch 
-Patch16:        meego-try-again-while-downloading-fails.patch
+Patch16:    meego-try-again-while-downloading-fails.patch
 Patch17:	docs.patch
 
 %description
@@ -87,6 +88,7 @@ Authors:
 %patch1 -p1 -b .log-issue
 %patch2 -p1 -b .meego-release
 %patch3 -p1 
+%patch4 -p1
 %patch5 -p1
 %patch6 -p1
 %patch10 -p1
