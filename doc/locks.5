@@ -1,0 +1,199 @@
+.TH "locks" "5" "4.25.0" "libzypp" "System Tools"
+.SH "NAME"
+.LP
+locks - libzypp locking file
+
+.SH "DESCRIPTION"
+.LP
+The file \fI/etc/zypp/locks\fR is read by libzypp at startup if
+\fIzypp.conf\fR allows it. The entries are used for initial locking of
+packages. Locking a package means not allowing to install or uninstall
+it. Valid entries are
+.TP
+\fI attribute\fR\fB:\fR \fIvalue\fR
+Where attributes and their values are described below.
+.br
+Locks are separated by empty lines.
+
+.SH "ATTRIBUTES"
+.LP
+All attributes are lower-case.
+
+.TP
+.B repo
+specifies repository restriction. Only alias is accepted.
+.br
+By default all repositories match.
+
+.TP
+.B type
+resolvable type restriction
+.br
+The values can be \fBpackage\fR, \fBpatch\fR, \fBpattern\fR, \fBproduct\fR and \fBsrcpackage\fR.
+.br
+By default all types match.
+
+.TP
+.B case_sensitive
+if strings are matched case sensitive.
+The values are \fBtrue\fR, \fBfalse\fR, \fBon\fR, \fBoff\fR.
+.br
+The default is case insensitive.
+
+.TP
+.B install_status
+status of object. Possible states are \fBinstalled\fR,
+\fBnot-installed\fR and \fBall\fR. If more install statuses are
+specified then the last one is used.
+.br
+The values are \fBinstalled\fR for all packages which are installed, \fBnon-installed\fR for packages which can be installed or reinstalled and \fBall\fR for both.
+.br
+The default is \fBall\fR.
+
+.TP
+.B match_type 
+type of string matching in values. Does not affect \fBtype\fR and \fBrepo\fR which must be specified exactly.
+.br
+The values are \fBexact\fR, \fBsubstring\fR, \fBregex\fR for regular
+expressions, \fBglob\fR for matching as on the command line, and \fBword\fR.
+.br
+The default is \fBsubstring\fR.
+
+.TP
+.B query_string
+String to be matched in multiple attributes. Should be restricted by
+another attribute with empty value ( it is recommended, because without restriction expect some performance problems ). 
+
+.TP
+.B version
+Restrict the lock only to some versions. It contains two parts: an
+optional operator and the version.
+.br
+The operator is \fB==\fR,\fB!=\fR,\fB<\fR,\fB>\fR,\fB<=\fR,\fB>=\fR. If operator is not specified then \fB==\fR is used.
+.br
+The version has the format 
+.RB [ epoch: ] version [ -release ].
+.br
+Example: version: < 0:0.11.4-2
+
+.TP
+.B solvable_name 
+name of object (e.g. zypper)
+
+.TP
+.B solvable_summary
+summary of object
+
+.TP
+.B solvable_arch
+architecture of object (e.g. x86_64, i586) 
+
+.TP
+.B solvable_description
+description of object 
+
+.TP
+.B solvable_eula 
+license text of objects which request accepting license by user
+
+.TP
+.B solvable_license 
+license of package (only for package) (e.g. GPL2)
+
+.TP
+.B solvable_keywords 
+keywords which specify package (only for package)
+
+.TP
+.B solvable_authors
+authors of package (only for package)
+
+.TP
+.B solvable_group
+package group (only for package) (e.g. Development/Tools/Version Control )
+
+.TP
+.B update_reference_type
+reference for update (e.g. bugzilla,cve) (only for patches)
+
+.SH "EXAMPLES"
+.LP
+
+.TP
+.B Exact Package
+This is the way YaST UI does it. Lock k3b (e.g. you don't want to update it).
+.br
+-----locks-----
+.br
+type: package
+.br
+solvable_name: k3b
+.br
+match_type: exact
+.br
+case_sensitive: on
+
+.TP
+.B Package Wildcard
+This is the way "zypper addlock cross-*-gcc-icecream-backend" does it.
+.br
+-----locks-----
+.br
+type: package
+.br
+solvable_name: cross-*-gcc-icecream-backend
+.br
+match_type: glob
+.br
+case_sensitive: on
+
+.TP
+.B Versioned Lock
+Do not install new GCC. This format is used when converting from the
+openSUSE-10.3 lock format.
+.br
+-----locks-----
+.br
+solvable_name: gcc
+.br
+match_type: glob
+.br
+version: > 4.2
+
+.TP
+.B Anything named KDE
+Locks everything which contains kde in the name.
+.br
+-----locks-----
+.br
+solvable_name: kde
+
+.TP
+.B Anything mentioning KDE
+Locks everything which contains kde in the name, summary, or description.
+.br
+-----locks-----
+.br
+query_string: kde
+.br
+solvable_name:
+.br
+solvable_summary:
+.br
+solvable_description:
+
+.SH "HOMEPAGE"
+
+This manual page only covers the most important attributes. The
+complete list is available at
+http://en.opensuse.org/Libzypp/Locksfile
+
+.SH "AUTHORS"
+.LP
+Josef Reidinger <jreidinger@suse.cz>
+.br
+Manual page contributions by Martin Vidner <mvidner@suse.cz>.
+
+.SH "SEE ALSO"
+.LP
+zypper(8)

@@ -1,0 +1,39 @@
+diff -uNr libzypp-9.8.3/zypp/media/MediaCurl.cc libzypp-9.8.3.new/zypp/media/MediaCurl.cc
+--- libzypp-9.8.3/zypp/media/MediaCurl.cc	2011-07-07 14:49:33.876569258 +0800
++++ libzypp-9.8.3.new/zypp/media/MediaCurl.cc	2011-07-07 14:48:47.070681412 +0800
+@@ -553,6 +553,9 @@
+       ZYPP_RETHROW(e);
+   }
+ 
++  if ( _url.getQueryParam( "proxy" ) == "_none_" )
++      SET_OPTION(CURLOPT_NOPROXY, "*");
++
+   // if the proxy was not set by url, then look
+   if ( _settings.proxy().empty() )
+   {
+@@ -646,12 +649,6 @@
+         SET_OPTION(CURLOPT_PROXYUSERPWD, proxyuserpwd.c_str());
+     }
+   }
+-  else
+-  {
+-#if LIBCURL_VERSION_NUMBER >= 0x071904
+-      SET_OPTION(CURLOPT_NOPROXY, "*");
+-#endif
+-  }
+ 
+   /** Speed limits */
+   if ( _settings.minDownloadSpeed() != 0 )
+diff -uNr libzypp-9.8.3/zypp/parser/RepoFileReader.cc libzypp-9.8.3.new/zypp/parser/RepoFileReader.cc
+--- libzypp-9.8.3/zypp/parser/RepoFileReader.cc	2011-07-04 22:04:11.000000000 +0800
++++ libzypp-9.8.3.new/zypp/parser/RepoFileReader.cc	2011-07-07 14:49:16.916746628 +0800
+@@ -90,7 +90,8 @@
+                url.setQueryParam("proxy", what[1]);
+                url.setQueryParam("proxyport", what[2]);
+               }
+-            }
++            } else
++              url.setQueryParam("proxy", "_none_");
+           } else
+             ERR << "Unknown attribute in [" << *its << "]: " << it->second << " ignored" << endl;
+         }
