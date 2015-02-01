@@ -5,7 +5,7 @@
  
    std::string ZConfig::distroverpkg() const
 -  { return "redhat-release"; }
-+  { return "tizen-release"; }
++  { return "meego-release"; }
  
    ///////////////////////////////////////////////////////////////////
  

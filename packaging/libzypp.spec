@@ -9,7 +9,6 @@ Release:        1
 Source:         %{name}-%{version}.tar.bz2
 Source1:        %{name}-rpmlintrc
 Source2:        libzypp.conf
-Source1001: packaging/libzypp.manifest 
 BuildRequires:  cmake
 BuildRequires:  libudev-devel
 BuildRequires:  libsatsolver-devel >= 0.14.9
@@ -40,7 +39,6 @@ Patch14:        linker.patch
 Patch15:	0001-Disable-proxy-only-if-_none_-is-set-in-repo-file.patch 
 Patch16:        meego-try-again-while-downloading-fails.patch
 Patch17:	docs.patch
-Patch18:	uuidgen.patch
 
 %description
 Package, Patch, Pattern, and Product Management
@@ -60,8 +58,7 @@ Authors:
 License:        GPL v2 or later
 Requires:       libzypp == %{version}
 Requires:       libxml2-devel curl-devel openssl-devel rpm-devel glibc-devel zlib-devel
-Requires:       bzip2 popt-devel glib2-devel boost-devel libstdc++-devel
-Requires:       pkgconfig(dbus-1)
+Requires:       bzip2 popt-devel dbus-devel glib2-devel boost-devel libstdc++-devel
 Requires:       cmake libsatsolver-devel >= 0.13.0
 Summary:        Package, Patch, Pattern, and Product Management - developers files
 Group:          System/Packages
@@ -98,10 +95,8 @@ Authors:
 %patch15 -p1
 %patch16 -p1
 %patch17 -p1
-%patch18 -p1
 
 %build
-cp %{SOURCE1001} .
 mkdir build
 cd build
 export CFLAGS="$RPM_OPT_FLAGS"
@@ -207,7 +202,6 @@ fi
 rm -rf "$RPM_BUILD_ROOT"
 
 %files -f zypp.lang
-%manifest libzypp.manifest
 %defattr(-,root,root,-)
 %dir /etc/zypp
 %dir /etc/zypp/repos.d
@@ -226,10 +220,10 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_libdir}/libzypp*so.*
 
 %files devel
-%manifest libzypp.manifest
 %defattr(-,root,root,-)
 %{_libdir}/libzypp.so
 %dir /usr/include/zypp
 /usr/include/zypp/*
-%{_libdir}/pkgconfig/libzypp.pc
 /usr/share/cmake/Modules/*
+%{_libdir}/pkgconfig/libzypp.pc
+
