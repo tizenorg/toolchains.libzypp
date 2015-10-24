@@ -18,7 +18,7 @@
 #include "zypp/Url.h"
 
 #include "zypp/repo/ServiceType.h"
-#include "zypp/repo/RepoInfoBase.h"
+#include "zypp/RepoInfo.h"
 
 
 ///////////////////////////////////////////////////////////////////
@@ -102,7 +102,7 @@ namespace zypp
     ReposToEnable::const_iterator reposToEnableBegin() const;
     ReposToEnable::const_iterator reposToEnableEnd() const;
 
-    /** Wheter \c alias_r is mentioned in ReposToEnable. */
+    /** Whether \c alias_r is mentioned in ReposToEnable. */
     bool repoToEnableFind( const std::string & alias_r ) const;
 
     /** Add \c alias_r to the set of ReposToEnable. */
@@ -126,7 +126,7 @@ namespace zypp
     ReposToDisable::const_iterator reposToDisableBegin() const;
     ReposToDisable::const_iterator reposToDisableEnd() const;
 
-    /** Wheter \c alias_r is mentioned in ReposToDisable. */
+    /** Whether \c alias_r is mentioned in ReposToDisable. */
     bool repoToDisableFind( const std::string & alias_r ) const;
 
     /** Add \c alias_r to the set of ReposToDisable. */
@@ -135,6 +135,40 @@ namespace zypp
     void delRepoToDisable( const std::string & alias_r );
     /** Clear the set of ReposToDisable. */
     void clearReposToDisable();
+    //@}
+
+    /** \name The original repo state as defined by the repoindex.xml upon last refresh.
+     *
+     * This state is remembered to detect any user modifications applied to the repos.
+     * It may not be available for all repos or in plugin services. In this case all
+     * changes requested by a service refresh are applied unconditionally.
+     */
+    //@{
+    struct RepoState
+    {
+      bool	enabled;
+      bool	autorefresh;
+      unsigned	priority;
+
+      RepoState()
+	: enabled( false ), autorefresh( true ), priority( RepoInfo::defaultPriority() )
+      {}
+      RepoState( const RepoInfo & repo_r )
+	: enabled( repo_r.enabled() ), autorefresh( repo_r.autorefresh() ), priority( repo_r.priority() )
+      {}
+      bool operator==( const RepoState & rhs ) const
+      { return( enabled==rhs.enabled && autorefresh==rhs.autorefresh && priority==rhs.priority ); }
+      bool operator!=( const RepoState & rhs ) const
+      { return ! operator==( rhs ); }
+      friend std::ostream & operator<<( std::ostream & str, const RepoState & obj );
+    };
+    typedef std::map<std::string,RepoState> RepoStates;
+
+    /** Access the remembered repository states. */
+    const RepoStates & repoStates() const;
+
+    /** Remember a new set of repository states. */
+    void setRepoStates( RepoStates newStates_r );
     //@}
 
   public:
@@ -147,18 +181,15 @@ namespace zypp
 
     /**
      * Write an XML representation of this ServiceInfo object.
-     */
-    virtual std::ostream & dumpAsXMLOn(std::ostream & str) const;
-
-    /**
-     * Write an XML representation of this ServiceInfo object.
      *
      * \param str
      * \param content if not empty, produces <service ...>content</service>
      *                otherwise <service .../>
      */
-    virtual std::ostream & dumpAsXMLOn(
-        std::ostream & str, const std::string & content) const;
+    virtual std::ostream & dumpAsXmlOn( std::ostream & str, const std::string & content = "" ) const;
+
+    /** \deprecated Use camel cased dumpAsXmlOn */
+    ZYPP_DEPRECATED std::ostream & dumpAsXMLOn( std::ostream & str, const std::string & content = "" ) const { return dumpAsXmlOn( str, content ); }
 
     class Impl;
 

@@ -1,20 +1,28 @@
 #
 # spec file for package libzypp
 #
-# Copyright (c) 2007 SUSE LINUX Products GmbH, Nuernberg, Germany.
-# This file and all modifications and additions to the pristine
-# package are under the same license as the package itself.
+# Copyright (c) 2005-2013 SUSE LINUX Products GmbH, Nuernberg, Germany.
 #
+# All modifications and additions to the file contributed by third parties
+# remain the property of their copyright owners, unless otherwise agreed
+# upon. The license for this file, and modifications and additions to the
+# file, is the same license as for the pristine package itself (unless the
+# license for the pristine package is not an Open Source License, in which
+# case the license is the MIT License). An "Open Source License" is a
+# license that conforms to the Open Source Definition (Version 1.9)
+# published by the Open Source Initiative.
+
 # Please submit bugfixes or comments via http://bugs.opensuse.org/
 #
 
-# norootforbuild
+
+%define force_gcc_46 0
 
 Name:           @PACKAGE@
-License:        GPLv2
-Group:          System/Packages
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Summary:        Package, Patch, Pattern, and Product Management
+License:        GPL-2.0+
+Group:          System/Packages
 Version:        @VERSION@
 Release:        0
 Source:         %{name}-%{version}.tar.bz2
@@ -24,7 +32,7 @@ Obsoletes:      yast2-packagemanager
 
 # Features we provide (update doc/autoinclude/FeatureTest.doc):
 Provides:       libzypp(plugin) = 0
-Provides:       libzypp(plugin:commit) = 0
+Provides:       libzypp(plugin:commit) = 1
 Provides:       libzypp(plugin:services) = 0
 Provides:       libzypp(plugin:system) = 0
 Provides:       libzypp(plugin:urlresolver) = 0
@@ -36,7 +44,7 @@ Recommends:     lsof
 %endif
 BuildRequires:  cmake
 BuildRequires:  openssl-devel
-%if 0%{?suse_version} >= 1130
+%if 0%{?suse_version} >= 1130 || 0%{?fedora_version} >= 16
 BuildRequires:  libudev-devel
 %else
 BuildRequires:  hal-devel
@@ -44,17 +52,32 @@ BuildRequires:  hal-devel
 BuildRequires:  boost-devel
 BuildRequires:  dejagnu
 BuildRequires:  doxygen
-BuildRequires:  gcc-c++
+%if 0%{?force_gcc_46}
+BuildRequires:  gcc46
+BuildRequires:  gcc46-c++
+%else
+BuildRequires:  gcc-c++ >= 4.6
+%endif
 BuildRequires:  gettext-devel
 BuildRequires:  graphviz
+BuildRequires:  graphviz-gnome
 BuildRequires:  libxml2-devel
+%if 0%{?suse_version} != 1110
+# No libproxy on SLES
 BuildRequires:  libproxy-devel
+%endif
 
-BuildRequires:  libsatsolver-devel >= 0.14.17
-%if 0%{?suse_version} >= 1100
-%requires_eq    satsolver-tools
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+BuildRequires:  pkgconfig
 %else
-Requires:       satsolver-tools
+BuildRequires:  pkg-config
+%endif
+
+BuildRequires:  libsolv-devel >= 0.4.2
+%if 0%{?suse_version} >= 1100
+%requires_eq    libsolv-tools
+%else
+Requires:       libsolv-tools
 %endif
 
 # required for testsuite, webrick
@@ -66,15 +89,13 @@ BuildRequires:  libexpat-devel
 BuildRequires:  expat-devel
 %endif
 
+Requires:       rpm
+
 %if 0%{?suse_version}
 BuildRequires:  rpm-devel
-Requires:       /usr/bin/uuidgen
-%if 0%{?suse_version} > 1020
-BuildRequires:  hicolor-icon-theme
-%endif
 %endif
 
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 BuildRequires:  glib2-devel
 BuildRequires:  popt-devel
 BuildRequires:  rpm-devel
@@ -83,8 +104,6 @@ BuildRequires:  rpm-devel
 %if 0%{?mandriva_version}
 BuildRequires:  glib2-devel
 BuildRequires:  librpm-devel
-# uuidgen
-Requires:       e2fsprogs
 %endif
 
 %if 0%{?suse_version}
@@ -93,21 +112,7 @@ Requires:       gpg2
 Requires:       gnupg2
 %endif
 
-%define min_aria_version 1.1.2
-# ---------------------------------------------------------------
-%if 0%{?suse_version} >= 1110
-# (almost) common codebase, but on SLES11-SP1 (according to Rudi
-# suse_version == 1110) we have a patched libcurl-7.19.0-11.22,
-# and no aria2. Furthermore SLE may use it's own set of .po files
-# from po/sle-zypp-po.tar.bz2.
-
-# this check should use 7.19.0 if SLE and 7.19.4 if not (backported
-# CURLOPT_REDIR_PROTOCOLS)
-%define min_curl_version 7.19.0-11.22
-%endif
-
-# ---------------------------------------------------------------
-
+%define min_curl_version 7.19.4
 %if 0%{?suse_version}
 %if 0%{?suse_version} >= 1100
 # Code11+
@@ -138,17 +143,17 @@ Authors:
     Ladislav Slezak <lslezak@suse.cz>
 
 %package devel
-Requires:       libzypp = %{version}
-Requires:       libxml2-devel
-Requires:       openssl-devel
-Requires:       rpm-devel
-Requires:       glibc-devel
-Requires:       zlib-devel
-Requires:       bzip2
-Requires:       popt-devel
 Requires:       boost-devel
+Requires:       bzip2
+Requires:       glibc-devel
 Requires:       libstdc++-devel
-%if 0%{?suse_version} >= 1130
+Requires:       libxml2-devel
+Requires:       libzypp = %{version}
+Requires:       openssl-devel
+Requires:       popt-devel
+Requires:       rpm-devel
+Requires:       zlib-devel
+%if 0%{?suse_version} >= 1130 || 0%{?fedora_version} >= 16
 Requires:       libudev-devel
 %else
 Requires:       hal-devel
@@ -157,19 +162,19 @@ Requires:       cmake
 %if 0%{?suse_version}
 %if 0%{?suse_version} >= 1100
 # Code11+
-Requires:  libcurl-devel >= %{min_curl_version}
+Requires:       libcurl-devel >= %{min_curl_version}
 %else
 # Code10
-Requires:  curl-devel
+Requires:       curl-devel
 %endif
 %else
 # Other distros (Fedora)
-Requires:  libcurl-devel >= %{min_curl_version}
+Requires:       libcurl-devel >= %{min_curl_version}
 %endif
 %if 0%{?suse_version} >= 1100
-%requires_ge    libsatsolver-devel
+%requires_ge    libsolv-devel
 %else
-Requires:       libsatsolver-devel
+Requires:       libsolv-devel
 %endif
 Summary:        Package, Patch, Pattern, and Product Management - developers files
 Group:          System/Packages
@@ -196,13 +201,19 @@ Authors:
 %build
 mkdir build
 cd build
+%if 0%{?force_gcc_46}
+export CC=gcc-4.6
+export CXX=g++-4.6
+%endif
 export CFLAGS="$RPM_OPT_FLAGS"
 export CXXFLAGS="$RPM_OPT_FLAGS"
 unset TRANSLATION_SET
+unset EXTRA_CMAKE_OPTIONS
 # SLE11-* might want its own translation set:
 %if 0%{?suse_version} == 1110
 if [ -f ../po/sle-zypp-po.tar.bz ]; then
   export TRANSLATION_SET=sle-zypp
+  export EXTRA_CMAKE_OPTIONS="-DDISABLE_LIBPROXY=ON"
 fi
 %endif
 cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -211,6 +222,7 @@ cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_SKIP_RPATH=1 \
       -DUSE_TRANSLATION_SET=${TRANSLATION_SET:-zypp} \
+      ${EXTRA_CMAKE_OPTIONS} \
       ..
 make %{?_smp_mflags} VERBOSE=1
 make -C doc/autodoc %{?_smp_mflags}
@@ -230,12 +242,14 @@ rm -rf "$RPM_BUILD_ROOT"
 cd build
 make install DESTDIR=$RPM_BUILD_ROOT
 make -C doc/autodoc install DESTDIR=$RPM_BUILD_ROOT
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 ln -s %{_sysconfdir}/yum.repos.d $RPM_BUILD_ROOT%{_sysconfdir}/zypp/repos.d
 %else
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zypp/repos.d
 %endif
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zypp/services.d
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zypp/vendors.d
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zypp/multiversion.d
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/zypp
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/zypp/plugins
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/zypp/plugins/commit
@@ -250,7 +264,6 @@ make -C po install DESTDIR=$RPM_BUILD_ROOT
 # Create filelist with translations
 cd ..
 %{find_lang} zypp
-
 
 %post
 /sbin/ldconfig
@@ -316,7 +329,6 @@ if is_old ${LOCKSFILE}
   done
 fi
 
-
 %postun -p /sbin/ldconfig
 
 %clean
@@ -325,12 +337,14 @@ rm -rf "$RPM_BUILD_ROOT"
 %files -f zypp.lang
 %defattr(-,root,root)
 %dir               %{_sysconfdir}/zypp
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 %{_sysconfdir}/zypp/repos.d
 %else
 %dir               %{_sysconfdir}/zypp/repos.d
 %endif
 %dir               %{_sysconfdir}/zypp/services.d
+%dir               %{_sysconfdir}/zypp/vendors.d
+%dir               %{_sysconfdir}/zypp/multiversion.d
 %config(noreplace) %{_sysconfdir}/zypp/zypp.conf
 %config(noreplace) %{_sysconfdir}/zypp/systemCheck
 %config(noreplace) %{_sysconfdir}/logrotate.d/zypp-history.lr

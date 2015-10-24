@@ -1,8 +1,1285 @@
 -------------------------------------------------------------------
+Fri Jul 25 12:56:17 CEST 2014 - ma@suse.de
+
+- JobReport: extend callback to allow passing UserData
+- hardlinkCopy must not fail if proc/sys/fs/protected_hardlink is on
+- adapt to changed boost::error_category throw specifier
+- version 14.27.0 (27)
+
+-------------------------------------------------------------------
+Fri Jul 18 08:57:39 CEST 2014 - ma@suse.de
+
+- Execute install scripts with cwd==/ (bnc#886764)
+- fix wrong '//' when extending URLs with an empty path (bnc#885254)
+- version 14.26.1 (26)
+
+-------------------------------------------------------------------
+Mon Jul 14 17:46:14 CEST 2014 - ma@suse.de
+
+- refreshService: add option to force repo status reset
+- Strip local filenames and args from URL.
+- version 14.26.0 (26)
+
+-------------------------------------------------------------------
+Fri Jul 11 13:42:43 CEST 2014 - ma@suse.de
+
+- Support RepoInfo content keywords (FATE#316287)
+- fix parsing repomd.xml twice
+- version 14.25.0 (23)
+
+-------------------------------------------------------------------
+Wed Jun 11 07:36:48 CEST 2014 - ma@suse.de
+
+- Patch: add isCategory/isSeverity convenience
+- If available provide info in ServiceException
+- version 14.24.0 (23)
+
+-------------------------------------------------------------------
+Wed Jun  4 11:49:32 CEST 2014 - ma@suse.de
+
+- Cleanup orphanded service repos on the fly (bnc#649846)
+- Service refresh must not attempt to modify plugin services
+- version 14.23.0 (23)
+
+-------------------------------------------------------------------
+Wed May 28 13:41:22 CEST 2014 - ma@suse.de
+
+- Fix service methods to throw ServiceException, not RepoException.
+- version 14.22.0 (22)
+
+-------------------------------------------------------------------
+Tue May 27 16:31:21 CEST 2014 - ma@suse.de
+
+- Let ServiceRefresh en-/disable repos with respect to previous state 
+  and user modifications.
+- RepoindexFileReader: support variable substitution
+- Parse optional autorefresh attribute from repoindex.xml
+- version 14.21.0 (20)
+
+-------------------------------------------------------------------
+Wed May 14 13:52:38 CEST 2014 - ma@suse.de
+
+- Add DownloadResolvableReport::infoInCache
+- Adjust transfer timeout settings (bnc#877405)
+- Fix computation of update candidate (bnc#834858)
+- version 14.20.0 (20)
+
+-------------------------------------------------------------------
+Thu May  8 18:54:25 CEST 2014 - ma@suse.de
+
+- KeyRingReport: New infoVerify callback showing the trusted key 
+  that will be used for verification.
+- version 14.19.0 (19)
+
+-------------------------------------------------------------------
+Sun May  4 01:15:49 CEST 2014 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu May  1 01:15:38 CEST 2014 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Apr 28 15:34:44 CEST 2014 - ma@suse.de
+
+- Derive initial AutoInstalled file from history
+- Target: maintain AutoInstalled database file
+- version 14.18.0 (17)
+
+-------------------------------------------------------------------
+Tue Apr 15 17:03:30 CEST 2014 - ma@suse.de
+
+- Factor out CommitPackageCache for standalone usage. (Fate#317077)
+- version 14.17.5 (17)
+
+-------------------------------------------------------------------
+Fri Apr 11 16:16:11 CEST 2014 - ma@suse.de
+
+- history: log %posttrans errors and output
+- adapt to libsolv cannges
+- version 14.17.4 (17)
+
+-------------------------------------------------------------------
+Fri Apr  4 14:29:13 CEST 2014 - ma@suse.de
+
+- Log warning if baseproduct symlink is dangling or missing
+- version 14.17.3 (17)
+
+-------------------------------------------------------------------
+Thu Apr  3 19:18:48 CEST 2014 - ma@suse.de
+
+- RepoManager: Fix RepoStatus computation and refresh of PLAINDIR repos.
+- Recreate solv file caches if content may change even if raw metadata
+  are unchanged (here: new pattern, product and application data).
+- version 14.17.2 (17)
+
+-------------------------------------------------------------------
+Wed Apr  2 18:09:47 CEST 2014 - ma@suse.de
+
+- CpeId: Basic functionality incl. matching
+- New SetRelationMixin
+- version 14.17.1 (17)
+
+-------------------------------------------------------------------
+Mon Mar 31 10:23:42 CEST 2014 - ma@suse.de
+
+- Use dummy licenses in test data (bnc#862471)
+- Install zypp-NameReqPrv helper for evaluating testcases.
+- version 14.17.0 (17)
+
+-------------------------------------------------------------------
+Tue Mar 18 14:55:11 CET 2014 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Feb 26 15:06:06 CET 2014 - ma@suse.de
+
+- Ignore failed-eject-exception on media change (bnc#865705)
+- version 14.16.1 (16)
+
+-------------------------------------------------------------------
+Tue Feb 25 13:42:13 CET 2014 - ma@suse.de
+
+- Remove duplicate code detecting known kinds and move it to 
+  ResKind::explicitBuiltin.
+- version 14.16.0 (16)
+
+-------------------------------------------------------------------
+Sun Feb 23 21:52:55 CET 2014 - ma@suse.de
+
+- Optionally exclude suggested packages from pattern content (bnc#857671)
+- Fix pattern content for auto-pattens (bnc#864087)
+- Don't report missing filelists for non-packages (bnc#864314)
+- adapt to new rpm weak dependency tags
+- version 14.15.0 (15)
+
+-------------------------------------------------------------------
+Fri Feb 14 13:51:46 CET 2014 - ma@suse.de
+
+- Provide ContentIdentifier of required update repositories in Product
+  (Fate#316160)
+- Support CpeId in Repository and Product attributes (Fate#316160)
+- Add API for retrieving repository ContentRevision and ContentIdentifier
+  (Fate#316160)
+- version 14.14.0 (14)
+
+-------------------------------------------------------------------
+Thu Feb 13 10:28:24 CET 2014 - ma@suse.de
+
+- Adjust solver defaults to changed soft lock handling (bnc#863275)
+- Avoid confusing solver decisions by not storing soft locks (bnc#863275)
+- version 14.13.0 (13)
+
+-------------------------------------------------------------------
+Tue Feb 11 21:22:58 CET 2014 - ma@suse.de
+
+- Add Product::endOfLife attribute (Fate#316172)
+- Let Product::shortName fallback to name.
+- Remove license text from test data (bnc#862471)
+- version 14.12.0 (12)
+
+-------------------------------------------------------------------
+Sun Feb  2 01:13:59 CET 2014 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Jan 31 19:09:28 CET 2014 - ma@suse.de
+
+- Introduce new solvable kind: Application (as provided by appdata.xml)
+- version 14.11.0 (7)
+
+-------------------------------------------------------------------
+Fri Jan 31 17:37:29 CET 2014 - ma@suse.de
+
+- String helper for printing indented text.
+- Offer translated names for dependency types.
+- version 14.10.0 (7)
+
+-------------------------------------------------------------------
+Thu Jan 30 01:13:40 CET 2014 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Jan 29 10:28:16 CET 2014 - ma@suse.de
+
+- No fileconflict check if DownloadOnly.
+- version 14.9.0 (7)
+
+-------------------------------------------------------------------
+Sat Jan 25 17:07:45 CET 2014 - ma@suse.de
+
+- Collect and execute %posttrans scripts delayed (Fate#313506)
+- BuildRequire libsolv implementing (Fate#309385)
+- version 14.8.0 (7)
+
+-------------------------------------------------------------------
+Fri Jan 24 11:26:52 CET 2014 - ma@suse.de
+
+- Patterns are no longer pseudo installed (Fate#309385)
+- version 14.7.0 (7)
+
+-------------------------------------------------------------------
+Fri Jan 24 08:41:13 CET 2014 - ma@suse.de
+
+- Check for file conflicts in commit (bnc#673720)
+- Add asUserSting: human readable (translated) string representation
+- Add file conflict detection during commit (bnc#673720)
+- Add Transaction::installedResult
+- version 14.6.0 (6)
+
+-------------------------------------------------------------------
+Mon Jan 20 17:14:48 CET 2014 - ma@suse.de
+
+- Fix cleanup code removing the @System solv file. (bnc#853065)
+- Fix missing priority in RepoInfo::dumpAsXML (bnc#855845)
+- version 14.5.0 (4)
+
+-------------------------------------------------------------------
+Tue Jan 14 18:38:49 CET 2014 - ma@suse.de
+
+- Improve ProgressData reporting.
+- Allow xml::escape directly dumping to a stream.
+- Add support for repo authentication using SSL client certificates 
+  (bnc#683914)
+- Enhance Queue to perform COW
+- fix documentation
+- version 14.4.0 (4)
+
+-------------------------------------------------------------------
+Thu Jan  9 01:13:40 CET 2014 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Dec 13 19:36:34 CET 2013 - ma@suse.de
+
+- Polish DiskUsageCounter
+- Add Bitmap type (aka sat::Map)
+- Remove obsolete DiskUsage class
+- version 14.3.0 (3)
+
+-------------------------------------------------------------------
+Thu Dec 12 18:01:18 CET 2013 - ma@suse.de
+
+- Fix disk usage computation for single packages (bnc#852943)
+- version 14.2.1 (2)
+
+-------------------------------------------------------------------
+Wed Dec  4 12:54:30 UTC 2013 - jreidinger@suse.com
+
+- Drop package-manager script as it is already deprecated and 
+  packagekit usage in desktop invalidates it. If someone really
+  need it, then place it to proper top level package which can 
+  decide what GUI is proper for given task.
+
+-------------------------------------------------------------------
+Wed Nov 20 16:32:30 CET 2013 - ma@suse.de
+
+- Extend commit plugin to send the transaction list (Fate#316203)
+- Add base/Json.h: JSON encoder for e.g. sending data to plugins
+- Re-evaluate dropped packages list on upgrade, even if product 
+  remains unchanged (bnc#849251).
+- Add ppc64le architecture
+- Add m68k architecture
+- version 14.2.0 (2)
+
+-------------------------------------------------------------------
+Fri Oct 25 14:21:31 CEST 2013 - ma@suse.de
+
+- Always properly initialize pool storage (bnc#846565)
+- version 14.1.1 (0)
+
+-------------------------------------------------------------------
+Thu Oct 17 17:57:54 CEST 2013 - ma@suse.de
+
+- Add Package isCached and cachedLocation methods
+- fixed PluginFrame::hasKey
+- version 14.1.0 (0)
+
+-------------------------------------------------------------------
+Thu Oct 10 01:13:48 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Oct  6 01:13:51 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Oct  3 01:14:59 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Oct  2 19:25:58 CEST 2013 - ma@suse.de
+
+- fix handling symlinks in export pathname on NFSv4 (bnc#804544)
+- Bump major version for Factory
+  13.1 is continued on SuSE-Code-13_1-Branch
+- version 14.0.0 (0)
+
+-------------------------------------------------------------------
+Sun Sep 29 01:15:02 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Sep 22 01:14:26 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Sep 18 17:06:06 CEST 2013 - ma@suse.de
+
+- Allow multiversionSpec manipulation in ZConfig
+- Fix string hexdecoding
+- Avoid parsing gpg subkeys but still parse multiple keys
+- version 13.7.0 (6)
+
+-------------------------------------------------------------------
+Sun Sep 15 01:14:55 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Sep 12 01:15:29 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Sep  5 01:13:43 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Sep  2 17:04:37 CEST 2013 - ma@suse.de
+
+- Avoid parsing gpg subkeys
+- Use explicit operator bool in TmpPath
+- Must keep legacy rpm level flag (bnc#838039)
+- version 13.6.0 (6)
+
+-------------------------------------------------------------------
+Sun Sep  1 01:14:03 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Aug 29 01:13:44 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Tue Aug 27 19:10:37 CEST 2013 - ma@suse.de
+
+- remove deprecated methods
+- fix key expiry date parsing (bnc#828672)
+- Provide additional keys data in case the ASCII armored blob
+  containes multiple keys
+- No rpmdb key import in readony mode (bnc#828672)
+- Fix rpmdb key import/export (bnc#828672)
+- Reduce amount of gpg calls when importing/exporting keys.
+- Add public accessible PublicKeyData/PublicKeyScanner classes
+- fix ASCII armored PublicKey parsing (bnc#828672)
+- fix typo (bnc#761985)
+- Fix multiversion update candidate to respect an installed objects
+  arch and vendor (bnc#820444)
+- fix logfile truncation introduced by previous fix for (bnc#825490)
+- Swig can't handle move constructor
+- Workaround bnc#819354 by executing rpm in /. (bnc#827609)
+- Try to detect Arch_ppc64p7 (requires glibc-2.16: getauxval)
+- Fix file probing via tftp:// (bnc#803316)
+- Add armv7hl to armv6hl compat to be in sync with libsolv.
+- Support for armv6hl
+- version 13.5.0 (5)
+
+-------------------------------------------------------------------
+Thu Aug 22 01:13:25 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Aug 18 01:13:20 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Aug 15 01:13:27 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Aug  8 01:13:27 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Aug  4 01:13:59 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Aug  1 01:13:52 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Jul 25 01:13:40 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Jul 18 01:13:43 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Jul 14 01:13:38 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Jul 11 01:13:49 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Jun 21 20:24:39 CEST 2013 - ma@suse.de
+
+- Fix testcases failing if local pathnames contain umlauts
+- Pathname: add move constructor and fix assign
+- Set logfile permission upon file creation only (bnc#825490)
+- Add arch ppc64p7
+- version 13.4.0 (4)
+
+-------------------------------------------------------------------
+Tue Jun 11 11:37:48 CEST 2013 - ma@suse.de
+
+- Speedup scanning for modaliases (bnc#824110)
+- version 13.3.0 (2)
+
+-------------------------------------------------------------------
+Sun May 26 01:13:15 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu May 23 01:13:13 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu May 16 12:22:48 CEST 2013 - ma@suse.de
+
+- Remove deprecated old stuff (aria2 support,
+  old InstallOrder, old History parser)
+- version 13.2.0 (2)
+
+-------------------------------------------------------------------
+Thu May 16 01:13:47 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun May 12 01:13:39 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu May  9 01:13:54 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu May  2 11:07:52 CEST 2013 - ma@suse.de
+
+- Discourage using SafeBool in favor of explicit operator bool
+- version 13.1.0 (1)
+
+-------------------------------------------------------------------
+Mon Apr 29 10:41:46 CEST 2013 - ma@suse.de
+
+- Testsuite: Workaround boost::thread being not header only since
+  boost-1.50 (boost ticket 7085)
+- Adaptions to smart_pointer changes in boost-1.53; mainly introduce
+  explicit operator bool; constructible and comparable with nullptr_t.
+- Bump major version for Factory
+  12.x is continued on SuSE-Code-12_3-Branch
+- version 13.0.0 (0)
+
+-------------------------------------------------------------------
+Sun Apr 28 01:14:07 CEST 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Apr  5 14:26:35 CEST 2013 - ma@suse.de
+
+- added new fuction zypp::ZYpp::provideSrcPackage
+- Treat opensuse-education as separate vendor (bnc#812608)
+- AArch64 support
+- version 12.11.0 (0)
+
+-------------------------------------------------------------------
+Wed Mar 27 12:31:17 CET 2013 - ma@suse.de
+
+- added tftp-support (bnc#803316)
+- version 12.10.1 (0)
+
+-------------------------------------------------------------------
+Tue Mar 26 13:06:21 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Mar 21 01:13:45 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Mar 10 01:14:01 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Mar  7 14:13:42 CET 2013 - ma@suse.de
+
+- Adapt to libsolv dataiterator fixes
+  (returning random data in some cases)
+- Require and adapt to changes in libsolv-0.3.0
+- version 12.10.0 (0)
+
+-------------------------------------------------------------------
+Thu Mar  7 01:13:25 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Mar  3 01:15:52 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Feb 27 08:41:18 CET 2013 - ma@suse.de
+
+- Rephrase error message if 'lsof' is not installed (bnc#694427)
+- version 12.9.0 (0)
+
+-------------------------------------------------------------------
+Fri Feb 15 12:49:18 CET 2013 - ma@suse.de
+
+- Handle dangling update script symlinks in instsys. (bnc#803751)
+- version 12.8.1 (0)
+
+-------------------------------------------------------------------
+Thu Feb 14 01:13:28 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Feb  7 01:16:50 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Feb  4 12:35:51 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Tue Jan 22 11:06:55 CET 2013 - ma@suse.de
+
+- make multicurl suppress progress reports for the metalink download
+- work around libcurl bug that sometimes gives us old values in the
+  progress callback
+- version 12.8.0 (0)
+
+-------------------------------------------------------------------
+Fri Jan 18 14:07:50 CET 2013 - ma@suse.de
+
+- Reduce logging
+- MediaMultiCurl: throw AbortRequestException if aborted by user
+- version 12.7.0 (0)
+
+-------------------------------------------------------------------
+Sun Jan 13 01:13:23 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Jan  6 01:13:17 CET 2013 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Dec 27 01:13:27 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Dec 17 13:31:15 CET 2012 - ma@suse.de
+
+- Add NamedValue<_Tp>: Simple value<>name mapping supporting aliases
+- Enable zypper to remove zypp locks without evaluating the
+  query (bnc#792901)
+- Configure curl to "not fix the BEAST attack" (bnc#779177)
+- version 12.6.0 (0)
+
+-------------------------------------------------------------------
+Sun Dec 16 01:13:16 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Dec  3 14:31:59 CET 2012 - ma@suse.de
+
+- HistoryLogReader: new HistoryLogData based API for parsing the new
+  history file entries (fate#312521)
+  The old HistoryItem based API is deprecated but will
+  still be available for a while if you compile with
+  -DWITH_DEPRECATED_HISTORYITEM_API.
+- Write userdata string to history log (fate#312521)
+- Add HistoryLogReader testcases
+- Adapt to libsolv 'medianr'-changes
+- version 12.5.0 (0)
+
+-------------------------------------------------------------------
+Thu Nov 22 01:14:42 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Nov 18 01:13:44 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Tue Nov 13 15:40:10 CET 2012 - ma@suse.de
+
+- Forward userdata string to commit plugins in BEGINPLUGIN (fate#312521)
+- Extend ZConfig to store a user defined string value (fate#312521)
+- Add SIGSEGV handler trying to log a stack trace
+- Add zypp::dumpBacktrace to dump current stack trace to a stream.
+- Use gettext plural handling (bnc#784666)
+- version 12.4.0 (0)
+
+-------------------------------------------------------------------
+Sun Nov  4 01:13:21 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Oct 24 10:40:38 CEST 2012 - ma@suse.de
+
+- Add simple sysconfig::write (bnc#766598)
+- For installed products also filelists when trying to find the buddy
+  (bnc#784900)
+- Provide information whether product license needs to be accepted.
+- version 12.3.0 (0)
+
+-------------------------------------------------------------------
+Thu Oct 18 01:13:43 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Oct  7 01:13:41 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Oct  1 11:00:42 CEST 2012 - ma@suse.de
+
+- Enable multiversion kernel and set multiversion.kernels in
+  /etc/zypp/zypp.conf to keep the latest, latest-1 and the running.
+- Fix typo (bnc#782801)
+- Relax evaluation of patch category tags (case insensitive)
+
+-------------------------------------------------------------------
+Sun Sep 30 01:13:18 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Sep 16 01:14:34 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Sep 12 10:28:00 CEST 2012 - ma@suse.de
+
+- Add str::commonPrefix
+- version 12.2.0 (0)
+
+-------------------------------------------------------------------
+Sun Sep  9 01:13:25 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Sep  5 11:56:54 CEST 2012 - gs@suse.de
+
+- Provide Target::reload()
+- version 12.1.0 (0)
+
+-------------------------------------------------------------------
+Sun Aug 26 01:13:31 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Aug 23 01:13:47 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Aug 19 01:14:11 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Aug 16 01:13:43 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Aug 10 12:53:47 CEST 2012 - ma@suse.de
+
+- Implement $ZYPP_LOCK_TIMEOUT: number of seconds to wait for a
+  zypplock becoming available (bnc#772965)
+- Unify update-scripts with same content(md5sum) (bnc#773575)
+- version 12.0.1 (0)
+
+-------------------------------------------------------------------
+Thu Aug  9 01:15:12 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Aug  2 11:55:00 CEST 2012 - ma@suse.de
+
+- set $ZYPP_IS_RUNNING during commit
+- Bump major version for Factory
+  11.x is continued on SuSE-Code-12_2-Branch
+- version 12.0.0 (0)
+
+-------------------------------------------------------------------
+Thu Aug  2 01:14:11 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Aug  1 15:32:40 CEST 2012 - ma@suse.de
+
+- Fixed typo (bnc#773467)
+- Erase any old repo instance from pool when (re)loading from cache
+- filter zero sized devices in disk usage counter(bnc#769819)
+- fix isSoftLocked computation
+- fix possibly reporting timeout as "aborted by user" (bnc#665327)
+- do not fork the uuidgen program, use kernel interface instead
+- remove obsolete hicolor-icon-theme BuildRequires
+- version 11.7.0 (6)
+
+-------------------------------------------------------------------
+Sun Jul 29 01:13:31 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Jul 19 01:13:43 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Jul  1 01:13:31 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Jun 28 01:14:27 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Jun 25 15:23:10 CEST 2012 - ma@suse.de
+
+- zypp.conf:servicesdir is ignored (bnc#765528)
+- allow libcurl to take proxy from environment iff proxy is not
+  configured or disallowed (bnc#745404)
+- version 11.6.3 (6)
+
+-------------------------------------------------------------------
+Sun Jun 24 01:14:32 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Jun 14 01:13:35 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Jun  8 15:57:22 CEST 2012 - ma@suse.de
+
+- Adjust weaklock fix
+
+-------------------------------------------------------------------
+Fri Jun  8 14:16:15 CEST 2012 - ma@suse.de
+
+- Fix processing of weak locks (bnc#749418, bnc#765164)
+- [valgrind] don't dereference if we may be past the end of the repositories.
+- add armv7hl workaround for Adrian
+- version 11.6.2 (6)
+
+-------------------------------------------------------------------
+Sun Jun  3 01:14:09 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu May 31 10:07:37 UTC 2012 - dmacvicar@suse.com
+
+- fix an invalid read revealed by valgrind in
+  RepositoryIterator::increment()
+
+-------------------------------------------------------------------
+Sun May 20 01:13:30 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu May 17 01:15:25 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun May 13 01:14:15 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Tue May  8 13:39:22 CEST 2012 - ma@suse.de
+
+- Use ld version script to hide symbols outside zypp namespace (bnc#755324)
+- remove base/Deprecated.h (macros now in APIConfig.h)
+- Disribute Easy.h in APIConfig.h
+- Add APIConfig.h providing ZYPP_API and ZYPP_LOCAL macros
+- version 11.6.0 (6)
+
+-------------------------------------------------------------------
+Fri May  4 11:18:17 CEST 2012 - ma@suse.de
+
+- build with gcc-4.7 (bnc#755324)
+- version 11.5.0 (5)
+
+-------------------------------------------------------------------
+Wed Apr 25 18:50:20 CEST 2012 - ma@suse.de
+
+- Fix lost device info when mounting CD/DVD
+
+-------------------------------------------------------------------
+Sun Apr 22 01:15:46 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Apr 19 10:19:05 CEST 2012 - ma@suse.de
+
+- Always consider (block) devices passed as url option (bnc#755815)
+
+-------------------------------------------------------------------
+Thu Apr 19 01:14:57 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Apr 18 18:38:06 CEST 2012 - ma@suse.de
+
+- Fix install progress hopping back and forth
+- Try to create a missing destination dir before switching to tmp
+  space (bnc#755239)
+
+-------------------------------------------------------------------
+Mon Apr 16 14:52:35 CEST 2012 - ma@suse.de
+
+- ResStatus: add 'unneeded' bit (determined by solver)
+- Force using gcc-4.6 until it builds with 4.7
+- Support multiversion definitions being read from files in /etc/zypp/multiversion.d.
+- Workaround doxygen SEGV and accept incomplete docs (until bnc#755402 is fixed)
+- Rename zypp::sat::AttrMatcher to zypp::StrMatcher (base/StrMatcher.h)
+- Support (source)package download by non-root user (bnc#755239)
+- Delay construction of ZYppGlobalLock until its actually needed (bnc#575096)
+- Fix buddy handling in solver results
+- Simplify Selectable::multiversionInstall
+- Don't cache defaultCandidate as it depends on solver::allowVendorChange flag (bnc#754286)
+- version 11.4.0 (4)
+
+-------------------------------------------------------------------
+Tue Apr 10 12:11:37 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Apr  8 01:13:24 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Apr  5 01:16:21 CEST 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Mar 26 14:47:59 CEST 2012 - ma@suse.de
+
+- Cleanup orphaned media attach points (bnc#751221)
+- Show max support status if package is in multiple repos (bnc#735841)
+- Parse proxy user/pass from url (bnc#752497)
+- Add CMake option to disable libproxy usage and disable it on SLE. (bnc#752500)
+- version 11.3.0 (1)
+
+-------------------------------------------------------------------
+Thu Mar 15 00:31:25 CET 2012 - ma@suse.de
+
+- Add API for patch severity (bnc#733723, FATE#312633)
+- version 11.2.0 (1)
+
+-------------------------------------------------------------------
+Tue Mar 13 13:04:48 CET 2012 - ma@suse.de
+
+- Force libproxy into using "/etc/sysconfig/proxy" if it exists (bnc#679322)
+- Apply soft locks by name and not per package (bnc#749418)
+- version 11.1.1 (1)
+
+-------------------------------------------------------------------
+Fri Feb  3 13:18:01 CET 2012 - ma@suse.de
+
+- Add Fetcher support for CHECKSUMS file (replaceing SHA1SUMS) (bnc#744302)
+- Build with -fvisibility-inlines-hidden
+- CheckAccessDeleted: avoid duplicate entries for the same PID (bnc#716972)
+- Correctly use user:pass directly embedded in a proxy url (bnc#740764)
+- new sat::Map - Libsolv (bit)Map wrapper.
+- always set splitprovides to true now that libsolv handles them better
+- version 11.1.0 (1)
+
+-------------------------------------------------------------------
+Thu Feb  2 01:14:17 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Jan 29 01:14:28 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Jan 22 01:13:30 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Tue Jan 10 18:31:41 CET 2012 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Dec 23 14:51:25 CET 2011 - ma@suse.de
+
+- Adapt Repository iteration to libsolv changes.
+- Add sat::Pool tests
+- Fix Flags<> api to be more consistent and add testcase.
+- Set min_curl_version 7.19.4 (bnc#735284)
+- Doc: add some words about 'Solver - Vendor protection'
+- version 11.0.0 (0)
+
+-------------------------------------------------------------------
+Thu Dec  1 01:13:37 CET 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Nov 28 18:08:42 CET 2011 - ma@suse.de
+
+- Fix and optimize Pathname ctor and provide testcases (bnc#721128)
+- Open all file descriptors with O_CLOEXEC to avoid leaks and races
+- Some improvements to the services documentation
+- Fix RW_pointer comparison with underlying smart pointer type.
+- version 10.3.5 (3)
+
+-------------------------------------------------------------------
+Sun Nov 27 01:13:10 CET 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Nov 17 01:13:15 CET 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Nov 11 13:38:42 CET 2011 - ma@suse.de
+
+- Try to find and use some CD/DVD device even if HAL/UDEV detection
+  fails (bnc#724807)
+- Static initialization problem fixes (by Harald Fernengel)
+- version 10.3.4 (3)
+
+-------------------------------------------------------------------
+Mon Nov  7 15:45:28 CET 2011 - ma@suse.de
+
+- Don't use proxy if disabled (bnc#696805)
+- version 10.3.3 (3)
+
+-------------------------------------------------------------------
+Mon Nov  7 13:49:44 UTC 2011 - dimstar@opensuse.org
+
+- Add pkg-config BuildRequires: We fail to detect libproxy due to
+  the missing pkg-config. Additionally, we have a .pc file
+  ourselfes, which we do not get the provides for [bnc#696805]
+
+-------------------------------------------------------------------
+Thu Nov  3 14:58:42 CET 2011 - ma@suse.de
+
+- Let RepoInfo::keepPackages properly default to FALSE (bnc#727385)
+- version 10.3.2 (3)
+
+-------------------------------------------------------------------
+Thu Nov  3 01:13:12 CET 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Oct 30 01:14:41 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Oct 27 01:14:10 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Oct 24 13:35:56 CEST 2011 - ma@suse.de
+
+- Explicitly include textLocale in package translation download
+
+-------------------------------------------------------------------
+Mon Oct 24 09:37:31 CEST 2011 - ma@suse.de
+
+- Update libversion info (due to ABI change in 10.2.0 (bnc#725407)
+- version 10.3.1 (3)
+
+-------------------------------------------------------------------
+Sun Oct 23 01:13:11 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Oct 21 11:47:39 CEST 2011 - ma@suse.de
+
+- Add zypp.conf option repo.refresh.locales: A list of locales for
+  which translated package descriptions should be downloaded if
+  available.
+- Explixitly set CURLOPT_PROXYAUTH
+- version 10.3.0 (1)
+
+-------------------------------------------------------------------
+Tue Oct 18 16:45:13 CEST 2011 - ma@suse.de
+
+- Add arch armv7tnhl and armv7thl
+- Fix RepoVariablesReplacer to compute substitution values on demand only
+- PathInfo::hardlinkCopy: fix handling cross-device links
+- version 10.2.0 (1)
+
+-------------------------------------------------------------------
+Sun Oct 16 01:13:37 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Oct 13 11:50:26 CEST 2011 - ma@suse.de
+
+- Must not differ between type nfs and nfs4 when checking the mount
+  table (bnc#710269)
+- version 10.1.1 (1)
+
+-------------------------------------------------------------------
+Thu Oct 13 01:13:37 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Tue Oct 11 15:20:43 CEST 2011 - ma@suse.de
+
+- Switch to using libsolv instead of satsolver
+- version 10.1.0 (1)
+
+-------------------------------------------------------------------
+Sun Oct  9 01:13:16 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Oct  6 01:14:00 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Tue Sep 20 09:57:04 CEST 2011 - ma@suse.de
+
+- Bump major version for Factory; 9.x is continued on SLE-11-SP2-Branch
+- version 10.0.0 (0)
+
+-------------------------------------------------------------------
+Tue Sep 13 10:51:53 CEST 2011 - ma@suse.de
+
+- Enhance Selectable API
+- version 9.11.0 (8)
+
+-------------------------------------------------------------------
+Sun Sep 11 01:18:59 CEST 2011 - ma@suse.de
+
+- Update sle-zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Sep 11 01:13:12 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Sep  8 01:19:28 CEST 2011 - ma@suse.de
+
+- Update sle-zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Sep  8 01:14:08 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Wed Sep  7 12:38:23 CEST 2011 - ma@suse.de
+
+- Explicitly require rpm.
+- version 9.10.2 (8)
+
+-------------------------------------------------------------------
+Sun Sep  4 01:16:54 CEST 2011 - ma@suse.de
+
+- Update sle-zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Sep  4 01:13:27 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Sep  1 01:13:36 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Aug 29 10:51:04 CEST 2011 - ma@suse.de
+
+- Extend mount entry comparison fix (bnc#710269)
+- version 9.10.2 (8)
+
+-------------------------------------------------------------------
+Thu Aug 25 01:17:06 CEST 2011 - ma@suse.de
+
+- Update sle-zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Mon Aug 22 13:57:16 CEST 2011 - ma@suse.de
+
+- Update sle-zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Aug 14 01:13:21 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Sun Aug  7 01:16:07 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Fri Aug  5 15:20:07 CEST 2011 - ma@suse.de
+
+- Attempt to fix smb mount entry comparison (bnc#710269)
+- version 9.10.1 (8)
+
+-------------------------------------------------------------------
+Thu Aug  4 14:54:47 CEST 2011 - ma@suse.de
+
+- Allow to turn Resolvers upgrade mode on and off (bnc#709480)
+- Fix reading of integer arrays from rpm headers (bnc#709716)
+- version 9.10.0 (8)
+
+-------------------------------------------------------------------
+Thu Aug  4 01:14:00 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
+Thu Jul 28 13:04:10 CEST 2011 - ma@suse.de
+
+- Evaluate CURLINFO_CONDITION_UNMET on zero sized successful transfers,
+  if compiled against libcurl-7.19.4 or above. (bnc#692260)
+- version 9.9.2 (8)
+
+-------------------------------------------------------------------
+Mon Jul 25 16:20:37 CEST 2011 - ma@suse.de
+
+- Always read /proc/mounts when looking for mounted media (bnc#705893)
+- version 9.9.1 (8)
+
+-------------------------------------------------------------------
+Fri Jul 22 13:12:34 CEST 2011 - ma@suse.de
+
+- MediaUserAuth: Do not expose libcurl header files.
+- version 9.9.0 (8)
+
+-------------------------------------------------------------------
+Mon Jul 18 11:33:25 CEST 2011 - ma@suse.de
+
+- More initialize parser structure fixes. (bnc#705181)
+- version 9.8.7 (8)
+
+-------------------------------------------------------------------
+Fri Jul 15 15:15:01 CEST 2011 - ma@suse.de
+
+- Check for /etc/sysconfig/storage changes before solving (bnc#702365)
+- version 9.8.6 (8)
+
+-------------------------------------------------------------------
+Fri Jul 15 13:58:53 CEST 2011 - ma@suse.de
+
+- Properly initialize parser structures (bnc#705181)
+- version 9.8.5 (8)
+
+-------------------------------------------------------------------
+Thu Jul  7 15:53:17 CEST 2011 - ma@suse.de
+
+- Fix tests for available libcurl version.
+- version 9.8.4 (8)
+
+-------------------------------------------------------------------
+Thu Jul  7 01:13:47 CEST 2011 - ma@suse.de
+
+- Update zypp-po.tar.bz2
+
+-------------------------------------------------------------------
 Mon Jul  4 10:41:42 CEST 2011 - ma@suse.de
 
-- Make fix for bnc#702576 more robust. 
-- Enhance fix for bnc#699435. Return an error if download in advance 
+- Make fix for bnc#702576 more robust.
+- Enhance fix for bnc#699435. Return an error if download in advance
   failed to provide all packages, so zypper does not silently quit.
 - version 9.8.3 (8)
 
@@ -25,7 +1302,7 @@ Tue Jun 28 16:04:50 CEST 2011 - ma@suse.de
 -------------------------------------------------------------------
 Tue Jun 21 10:44:47 CEST 2011 - dmacvicar@suse.de
 
-- Add configuration template for automatic kernel 
+- Add configuration template for automatic kernel
   purge (feature#312018) to zypp.conf
 
 -------------------------------------------------------------------

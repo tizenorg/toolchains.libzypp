@@ -21,8 +21,8 @@
 
 #include <cerrno>
 #include <iostream>
-#include <zypp/base/LogControl.h>
-#include <zypp/base/LogTools.h>
+#include "zypp/base/LogControl.h"
+#include "zypp/base/LogTools.h"
 using std::endl;
 
 #include "zypp/base/GzStream.h"
@@ -79,12 +79,12 @@ namespace zypp
 	  // we expect gzdopen to handle errors of ::open
           if ( mode_r == std::ios_base::in )
 	  {
-            _fd = ::open( name_r, O_RDONLY );
+            _fd = ::open( name_r, O_RDONLY | O_CLOEXEC );
             _file = gzdopen( _fd, "rb" );
 	  }
           else if ( mode_r == std::ios_base::out )
 	  {
-            _fd = ::open( name_r, O_WRONLY|O_CREAT, 0666 );
+            _fd = ::open( name_r, O_WRONLY|O_CREAT|O_CLOEXEC, 0666 );
             _file = gzdopen( _fd, "wb" );
 	  }
           // else: not supported

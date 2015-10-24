@@ -2,22 +2,23 @@
 # SOURCES                                                          #
 ####################################################################
 
-ADD_DEFINITIONS(-DLOCALEDIR="${CMAKE_INSTALL_PREFIX}/share/locale" -DTEXTDOMAIN="zypp" )
+ADD_DEFINITIONS(-DLOCALEDIR="${CMAKE_INSTALL_PREFIX}/share/locale" -DTEXTDOMAIN="zypp" -DZYPP_DLL )
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
 #FILE(WRITE filename "message to write"... )
 
 SET( zypp_SRCS
+  Application.cc
   ByteCount.cc
   Capabilities.cc
   Capability.cc
   CapMatch.cc
   Changelog.cc
   CheckSum.cc
+  CpeId.cc
   Date.cc
   Dep.cc
   Digest.cc
-  DiskUsage.cc
   DiskUsageCounter.cc
   DownloadMode.cc
   Edition.cc
@@ -89,9 +90,12 @@ SET( zypp_EARLY_SRCS
 )
 
 SET( zypp_HEADERS
+  APIConfig.h
+  Application.h
   Arch.h
   AutoDispose.h
   Bit.h
+  Bitmap.h
   ByteCount.h
   Callback.h
   Capabilities.h
@@ -99,12 +103,13 @@ SET( zypp_HEADERS
   CapMatch.h
   Changelog.h
   CheckSum.h
+  ContentType.h
   CountryCode.h
+  CpeId.h
   Date.h
   Dep.h
   Digest.h
   DiskUsageCounter.h
-  DiskUsage.h
   DownloadMode.h
   Edition.h
   ExternalProgram.h
@@ -175,6 +180,7 @@ SET( zypp_HEADERS
   TmpPath.h
   TriBool.h
   Url.h
+  UserData.h
   VendorAttr.h
   VendorSupportOptions.h
   ZConfig.h
@@ -190,6 +196,7 @@ INSTALL(  FILES ${zypp_HEADERS} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/zyp
 
 SET( zypp_base_SRCS
   base/InterProcessMutex.cc
+  base/Backtrace.cc
   base/SerialNumber.cc
   base/Random.cc
   base/Measure.cc
@@ -199,7 +206,10 @@ SET( zypp_base_SRCS
   base/IOStream.cc
   base/InputStream.cc
   base/ReferenceCounted.cc
+  base/SetRelationMixin.cc
   base/String.cc
+  base/StrMatcher.h
+  base/StrMatcher.cc
   base/Regex.cc
   base/Unit.cc
   base/ExternalDataSource.cc
@@ -212,6 +222,7 @@ SET( zypp_base_SRCS
 
 SET( zypp_base_HEADERS
   base/InterProcessMutex.h
+  base/Backtrace.h
   base/Collector.h
   base/SerialNumber.h
   base/Easy.h
@@ -221,10 +232,10 @@ SET( zypp_base_HEADERS
   base/Counter.h
   base/Debug.h
   base/DefaultIntegral.h
-  base/Deprecated.h
   base/DtorReset.h
   base/Exception.h
   base/UserRequestException.h
+  base/EnumClass.h
   base/ExternalDataSource.h
   base/Fd.h
   base/Flags.h
@@ -235,23 +246,27 @@ SET( zypp_base_HEADERS
   base/IOStream.h
   base/InputStream.h
   base/Iterator.h
+  base/Json.h
   base/LogControl.h
   base/LogTools.h
   base/Logger.h
   base/Measure.h
+  base/NamedValue.h
   base/NonCopyable.h
   base/ProfilingFormater.h
   base/ProvideNumericId.h
   base/PtrTypes.h
   base/ReferenceCounted.h
-  base/SafeBool.h
+  base/SetRelationMixin.h
   base/Signal.h
   base/String.h
+  base/StrMatcher.h
   base/Regex.h
   base/Sysconfig.h
   base/Tr1hash.h
   base/Unit.h
   base/WatchFile.h
+  base/Xml.h
 )
 
 INSTALL(  FILES
@@ -272,7 +287,6 @@ SET( zypp_media_SRCS
   media/ProxyInfo.cc
   media/MediaCurl.cc
   media/MediaMultiCurl.cc
-  media/MediaAria2c.cc
   media/MediaISO.cc
   media/MediaPlugin.cc
   media/MediaSource.cc
@@ -295,7 +309,6 @@ SET( zypp_media_HEADERS
   media/MediaCIFS.h
   media/MediaCurl.h
   media/MediaMultiCurl.h
-  media/MediaAria2c.h
   media/MediaDIR.h
   media/MediaDISK.h
   media/MediaException.h
@@ -364,7 +377,6 @@ SET( zypp_parser_HEADERS
   parser/HistoryLogReader.h
   parser/ParserProgress.h
   parser/RepoFileReader.h
-  parser/xml_escape_parser.hpp
   parser/RepoindexFileReader.h
   parser/ServiceFileReader.h
   parser/ProductFileReader.h
@@ -390,28 +402,15 @@ INSTALL(  FILES
   DESTINATION ${CMAKE_INSTALL_PREFIX}/include/zypp/parser/susetags
 )
 
-SET( zypp_parser_plaindir_SRCS
-  parser/plaindir/RepoParser.cc
-)
-
-SET( zypp_parser_plaindir_HEADERS
-  parser/plaindir/RepoParser.h
-)
-
-INSTALL(  FILES
-  ${zypp_parser_plaindir_HEADERS}
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/zypp/parser/plaindir
-)
-
 SET( zypp_parser_xml_SRCS
   parser/xml/Node.cc
   parser/xml/ParseDef.cc
   parser/xml/ParseDefConsume.cc
   parser/xml/ParseDefException.cc
   parser/xml/Reader.cc
+  parser/xml/XmlEscape.cc
   parser/xml/XmlString.cc
   parser/xml/libxmlfwd.cc
-  parser/xml/xml_escape_parser.cpp
 )
 
 SET( zypp_parser_xml_HEADERS
@@ -425,7 +424,6 @@ SET( zypp_parser_xml_HEADERS
   parser/xml/XmlEscape.h
   parser/xml/XmlString.h
   parser/xml/libxmlfwd.h
-  parser/xml/xml_escape_parser.hpp
 )
 
 INSTALL(  FILES
@@ -463,13 +461,11 @@ INSTALL(  FILES
 
 
 SET( zypp_pool_SRCS
-  pool/GetResolvablesToInsDel.cc
   pool/PoolImpl.cc
   pool/PoolStats.cc
 )
 
 SET( zypp_pool_HEADERS
-  pool/GetResolvablesToInsDel.h
   pool/PoolImpl.h
   pool/PoolStats.h
   pool/PoolTraits.h
@@ -483,12 +479,9 @@ INSTALL(  FILES
 
 SET( zypp_solver_detail_SRCS
   solver/detail/Helper.cc
-  solver/detail/InstallOrder.cc
   solver/detail/ProblemSolutionIgnore.cc
   solver/detail/ProblemSolutionCombi.cc
   solver/detail/Resolver.cc
-  solver/detail/ResolverUpgrade.cc
-  solver/detail/Resolver_problems.cc
   solver/detail/SolutionAction.cc
   solver/detail/Testcase.cc
   solver/detail/SolverQueueItem.cc
@@ -503,7 +496,6 @@ SET( zypp_solver_detail_SRCS
 
 SET( zypp_solver_detail_HEADERS
   solver/detail/Helper.h
-  solver/detail/InstallOrder.h
   solver/detail/ProblemSolutionIgnore.h
   solver/detail/ProblemSolutionCombi.h
   solver/detail/Resolver.h
@@ -530,14 +522,15 @@ SET( zypp_sat_SRCS
   sat/Solvable.cc
   sat/SolvableSet.cc
   sat/SolvIterMixin.cc
+  sat/Map.cc
   sat/Queue.cc
+  sat/FileConflicts.cc
   sat/Transaction.cc
   sat/WhatProvides.cc
   sat/WhatObsoletes.cc
   sat/LocaleSupport.cc
   sat/LookupAttr.cc
   sat/SolvAttr.cc
-  sat/AttrMatcher.cc
 )
 
 SET( zypp_sat_HEADERS
@@ -545,7 +538,9 @@ SET( zypp_sat_HEADERS
   sat/Solvable.h
   sat/SolvableSet.h
   sat/SolvIterMixin.h
-  sat/Queue.cc
+  sat/Map.h
+  sat/Queue.h
+  sat/FileConflicts.h
   sat/Transaction.h
   sat/WhatProvides.h
   sat/WhatObsoletes.h
@@ -553,7 +548,6 @@ SET( zypp_sat_HEADERS
   sat/LookupAttr.h
   sat/LookupAttrTools.h
   sat/SolvAttr.h
-  sat/AttrMatcher.h
 )
 
 INSTALL(  FILES
@@ -577,8 +571,9 @@ INSTALL(  FILES
 
 
 SET( zypp_target_SRCS
+  target/RpmPostTransCollector.cc
   target/RequestedLocalesFile.cc
-  target/SoftLocksFile.cc
+  target/SolvIdentFile.cc
   target/HardLocksFile.cc
   target/CommitPackageCache.cc
   target/CommitPackageCacheImpl.cc
@@ -586,11 +581,14 @@ SET( zypp_target_SRCS
   target/TargetCallbackReceiver.cc
   target/TargetException.cc
   target/TargetImpl.cc
+  target/TargetImpl.commitFindFileConflicts.cc
+
 )
 
 SET( zypp_target_HEADERS
+  target/RpmPostTransCollector.h
   target/RequestedLocalesFile.h
-  target/SoftLocksFile.h
+  target/SolvIdentFile.h
   target/HardLocksFile.h
   target/CommitPackageCache.h
   target/CommitPackageCacheImpl.h
@@ -760,7 +758,6 @@ SET( zypp_repo_HEADERS
   repo/Downloader.h
   repo/RepoVariables.h
   repo/RepoInfoBase.h
-  repo/RepoInfoBaseImpl.h
   repo/PluginServices.h
   repo/ServiceRepos.h
 )
@@ -822,7 +819,6 @@ ${zypp_pool_SRCS}
 ${zypp_parser_susetags_SRCS}
 ${zypp_parser_xml_SRCS}
 ${zypp_parser_yum_SRCS}
-${zypp_parser_plaindir_SRCS}
 ${zypp_parser_ws_SRCS}
 ${zypp_parser_SRCS}
 ${zypp_media_proxyinfo_SRCS}
@@ -853,7 +849,6 @@ ${zypp_target_rpm_HEADERS}
 ${zypp_parser_tagfile_HEADERS}
 ${zypp_parser_susetags_HEADERS}
 ${zypp_parser_yum_HEADERS}
-${zypp_parser_plaindir_HEADERS}
 ${zypp_parser_xml_HEADERS}
 ${zypp_parser_ws_HEADERS}
 ${zypp_parser_HEADERS}
@@ -892,7 +887,7 @@ ENDMACRO( SET_LOGGROUP )
 SET_LOGGROUP( "zypp" ${zypp_lib_SRCS} )
 
 # override some defaults
-SET_LOGGROUP( "satsolver" ${zypp_sat_SRCS} )
+SET_LOGGROUP( "libsolv" ${zypp_sat_SRCS} )
 #SET_LOGGROUP( "group" ${zypp_target_rpm_SRCS} )
 #SET_LOGGROUP( "group" ${zypp_parser_yum2_SRCS} )
 #SET_LOGGROUP( "group" ${zypp_capability_SRCS} )
@@ -920,6 +915,7 @@ SET_LOGGROUP( "satsolver" ${zypp_sat_SRCS} )
 ADD_LIBRARY(zypp SHARED ${zypp_lib_SRCS})
 SET_TARGET_PROPERTIES( zypp PROPERTIES VERSION "${LIBZYPP_VERSION_INFO}" )
 SET_TARGET_PROPERTIES( zypp PROPERTIES SOVERSION "${LIBZYPP_SOVERSION_INFO}" )
+SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libzypp.map")
 ADD_DEPENDENCIES(zypp schema_header)
 # System libraries
 SET(UTIL_LIBRARY util)
@@ -929,7 +925,7 @@ TARGET_LINK_LIBRARIES(zypp ${GETTEXT_LIBRARIES} )
 TARGET_LINK_LIBRARIES(zypp ${CURL_LIBRARY} )
 TARGET_LINK_LIBRARIES(zypp ${LIBXML_LIBRARY} )
 TARGET_LINK_LIBRARIES(zypp ${ZLIB_LIBRARY} )
-TARGET_LINK_LIBRARIES(zypp ${SATSOLVER_LIBRARY} ${SATSOLVER_EXT_LIBRARY} ${EXPAT_LIBRARY})
+TARGET_LINK_LIBRARIES(zypp ${LibSolv_LIBRARIES} ${EXPAT_LIBRARY})
 TARGET_LINK_LIBRARIES(zypp ${OPENSSL_LIBRARIES} )
 TARGET_LINK_LIBRARIES(zypp ${CRYPTO_LIBRARIES} )
 TARGET_LINK_LIBRARIES(zypp ${SIGNALS_LIBRARY} )

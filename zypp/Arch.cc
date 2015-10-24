@@ -82,7 +82,7 @@ namespace zypp
           break;
         }
       // This is a builtin: compatible if mentioned in targetEntry_r
-      return targetEntry_r._compatBits & _idBit;
+      return bool( targetEntry_r._compatBits & _idBit );
     }
 
     /** compare by score, then archStr. */
@@ -137,72 +137,85 @@ ZYPP_DEFINE_ID_HASHABLE( zypp::Arch::CompatEntry );
 namespace zypp
 { /////////////////////////////////////////////////////////////////
 
+  // Builtin architecture STRING VALUES to be
+  // used in defCompatibleWith below!
+  //
+  // const IdString  _foo( "foo" );
+  // const Arch Arch_foo( _foo() );
+  //
+  // NOTE: Builtin CLASS Arch CONSTANTS are defined below.
+  //       You have to change them accordingly in Arch.h.
+  //
+  // NOTE: Thake care CompatBits::IntT is able to provide one
+  //       bit for each architecture.
+  //
+  #define DEF_BUILTIN(A) \
+  namespace { static inline const IdString & _##A () { static IdString __str(#A); return __str; } } \
+  const Arch Arch_##A( _##A() )
+
+  DEF_BUILTIN( noarch );
+
+  DEF_BUILTIN( i386 );
+  DEF_BUILTIN( i486 );
+  DEF_BUILTIN( i586 );
+  DEF_BUILTIN( i686 );
+  DEF_BUILTIN( athlon );
+  DEF_BUILTIN( x86_64 );
+
+  DEF_BUILTIN( pentium3 );
+  DEF_BUILTIN( pentium4 );
+
+  DEF_BUILTIN( s390 );
+  DEF_BUILTIN( s390x );
+
+  DEF_BUILTIN( ppc );
+  DEF_BUILTIN( ppc64 );
+  DEF_BUILTIN( ppc64p7 );
+
+  DEF_BUILTIN( ppc64le );
+
+  DEF_BUILTIN( ia64 );
+
+  DEF_BUILTIN( alphaev67 );
+  DEF_BUILTIN( alphaev6 );
+  DEF_BUILTIN( alphapca56 );
+  DEF_BUILTIN( alphaev56 );
+  DEF_BUILTIN( alphaev5 );
+  DEF_BUILTIN( alpha );
+
+  DEF_BUILTIN( sparc64v );
+  DEF_BUILTIN( sparcv9v );
+  DEF_BUILTIN( sparc64 );
+  DEF_BUILTIN( sparcv9 );
+  DEF_BUILTIN( sparcv8 );
+  DEF_BUILTIN( sparc );
+
+  DEF_BUILTIN( aarch64 );
+  DEF_BUILTIN( armv7tnhl );
+  DEF_BUILTIN( armv7thl );
+  DEF_BUILTIN( armv7nhl );
+  DEF_BUILTIN( armv7hl );
+  DEF_BUILTIN( armv7l );
+  DEF_BUILTIN( armv6hl );
+  DEF_BUILTIN( armv6l );
+  DEF_BUILTIN( armv5tejl );
+  DEF_BUILTIN( armv5tel );
+  DEF_BUILTIN( armv5l );
+  DEF_BUILTIN( armv4tl );
+  DEF_BUILTIN( armv4l );
+  DEF_BUILTIN( armv3l );
+
+  DEF_BUILTIN( sh3 );
+
+  DEF_BUILTIN( sh4 );
+  DEF_BUILTIN( sh4a );
+
+  DEF_BUILTIN(m68k);
+#undef DEF_BUILTIN
+
   ///////////////////////////////////////////////////////////////////
   namespace
   { /////////////////////////////////////////////////////////////////
-
-    // Builtin architecture STRING VALUES to be
-    // used in defCompatibleWith below!
-    //
-    // const IdString  _foo( "foo" );
-    //
-    // NOTE: Builtin CLASS Arch CONSTANTS are defined below.
-    //       You have to change them accordingly.
-    //
-    // NOTE: Thake care CompatBits::IntT is able to provide one
-    //       bit for each architecture.
-    //
-#define DEF_BUILTIN(A) const IdString  _##A( #A );
-    DEF_BUILTIN( noarch );
-
-    DEF_BUILTIN( i386 );
-    DEF_BUILTIN( i486 );
-    DEF_BUILTIN( i586 );
-    DEF_BUILTIN( i686 );
-    DEF_BUILTIN( athlon );
-    DEF_BUILTIN( x86_64 );
-
-    DEF_BUILTIN( pentium3 );
-    DEF_BUILTIN( pentium4 );
-
-    DEF_BUILTIN( s390 );
-    DEF_BUILTIN( s390x );
-
-    DEF_BUILTIN( ppc );
-    DEF_BUILTIN( ppc64 );
-
-    DEF_BUILTIN( ia64 );
-
-    DEF_BUILTIN( alphaev67 );
-    DEF_BUILTIN( alphaev6 );
-    DEF_BUILTIN( alphapca56 );
-    DEF_BUILTIN( alphaev56 );
-    DEF_BUILTIN( alphaev5 );
-    DEF_BUILTIN( alpha );
-
-    DEF_BUILTIN( sparc64v );
-    DEF_BUILTIN( sparcv9v );
-    DEF_BUILTIN( sparc64 );
-    DEF_BUILTIN( sparcv9 );
-    DEF_BUILTIN( sparcv8 );
-    DEF_BUILTIN( sparc );
-
-    DEF_BUILTIN( armv7nhl );
-    DEF_BUILTIN( armv7hl );
-    DEF_BUILTIN( armv7l );
-    DEF_BUILTIN( armv6l );
-    DEF_BUILTIN( armv5tejl );
-    DEF_BUILTIN( armv5tel );
-    DEF_BUILTIN( armv5l );
-    DEF_BUILTIN( armv4tl );
-    DEF_BUILTIN( armv4l );
-    DEF_BUILTIN( armv3l );
-
-    DEF_BUILTIN( sh3 );
-
-    DEF_BUILTIN( sh4 );
-    DEF_BUILTIN( sh4a );
-#undef DEF_BUILTIN
 
     ///////////////////////////////////////////////////////////////////
     //
@@ -271,61 +284,70 @@ namespace zypp
         // _noarch must have _idBit 0.
         // Other builtins have 1-bit set
         // and are initialized done on the fly.
-        _compatSet.insert( Arch::CompatEntry( _noarch, 0 ) );
+        _compatSet.insert( Arch::CompatEntry( _noarch(), 0 ) );
         ///////////////////////////////////////////////////////////////////
         // Define the CompatibleWith relation:
         //
         // NOTE: Order of definition is significant! (Arch::compare)
 	//       - define compatible (less) architectures first!
         //
-        defCompatibleWith( _i386,	_noarch );
-        defCompatibleWith( _i486,	_noarch,_i386 );
-        defCompatibleWith( _i586,	_noarch,_i386,_i486 );
-        defCompatibleWith( _i686,	_noarch,_i386,_i486,_i586 );
-        defCompatibleWith( _athlon,	_noarch,_i386,_i486,_i586,_i686 );
-        defCompatibleWith( _x86_64,	_noarch,_i386,_i486,_i586,_i686,_athlon );
+        defCompatibleWith( _i386(),		_noarch() );
+        defCompatibleWith( _i486(),		_noarch(),_i386() );
+        defCompatibleWith( _i586(),		_noarch(),_i386(),_i486() );
+        defCompatibleWith( _i686(),		_noarch(),_i386(),_i486(),_i586() );
+        defCompatibleWith( _athlon(),		_noarch(),_i386(),_i486(),_i586(),_i686() );
+        defCompatibleWith( _x86_64(),		_noarch(),_i386(),_i486(),_i586(),_i686(),_athlon() );
 
-        defCompatibleWith( _pentium3,	_noarch,_i386,_i486,_i586,_i686 );
-        defCompatibleWith( _pentium4,	_noarch,_i386,_i486,_i586,_i686,_pentium3 );
+        defCompatibleWith( _pentium3(),		_noarch(),_i386(),_i486(),_i586(),_i686() );
+        defCompatibleWith( _pentium4(),		_noarch(),_i386(),_i486(),_i586(),_i686(),_pentium3() );
 
-        defCompatibleWith( _ia64,	_noarch,_i386,_i486,_i586,_i686 );
+        defCompatibleWith( _ia64(),		_noarch(),_i386(),_i486(),_i586(),_i686() );
         //
-        defCompatibleWith( _s390,	_noarch );
-        defCompatibleWith( _s390x,	_noarch,_s390 );
+        defCompatibleWith( _s390(),		_noarch() );
+        defCompatibleWith( _s390x(),		_noarch(),_s390() );
         //
-        defCompatibleWith( _ppc,	_noarch );
-        defCompatibleWith( _ppc64,	_noarch,_ppc );
+        defCompatibleWith( _ppc(),		_noarch() );
+        defCompatibleWith( _ppc64(),		_noarch(),_ppc() );
+        defCompatibleWith( _ppc64p7(),		_noarch(),_ppc(),_ppc64() );
         //
-        defCompatibleWith( _alpha,	_noarch );
-        defCompatibleWith( _alphaev5,	_noarch,_alpha );
-        defCompatibleWith( _alphaev56,	_noarch,_alpha,_alphaev5 );
-        defCompatibleWith( _alphapca56,	_noarch,_alpha,_alphaev5,_alphaev56 );
-        defCompatibleWith( _alphaev6,	_noarch,_alpha,_alphaev5,_alphaev56,_alphapca56 );
-        defCompatibleWith( _alphaev67,	_noarch,_alpha,_alphaev5,_alphaev56,_alphapca56,_alphaev6 );
+        defCompatibleWith( _ppc64le(),		_noarch() );
         //
-        defCompatibleWith( _sparc,	_noarch );
-        defCompatibleWith( _sparcv8,	_noarch,_sparc );
-        defCompatibleWith( _sparcv9,	_noarch,_sparc,_sparcv8 );
-	defCompatibleWith( _sparcv9v,	_noarch,_sparc,_sparcv8,_sparcv9 );
+        defCompatibleWith( _alpha(),		_noarch() );
+        defCompatibleWith( _alphaev5(),		_noarch(),_alpha() );
+        defCompatibleWith( _alphaev56(),	_noarch(),_alpha(),_alphaev5() );
+        defCompatibleWith( _alphapca56(),	_noarch(),_alpha(),_alphaev5(),_alphaev56() );
+        defCompatibleWith( _alphaev6(),		_noarch(),_alpha(),_alphaev5(),_alphaev56(),_alphapca56() );
+        defCompatibleWith( _alphaev67(),	_noarch(),_alpha(),_alphaev5(),_alphaev56(),_alphapca56(),_alphaev6() );
+        //
+        defCompatibleWith( _sparc(),		_noarch() );
+        defCompatibleWith( _sparcv8(),		_noarch(),_sparc() );
+        defCompatibleWith( _sparcv9(),		_noarch(),_sparc(),_sparcv8() );
+	defCompatibleWith( _sparcv9v(),		_noarch(),_sparc(),_sparcv8(),_sparcv9() );
 	//
-        defCompatibleWith( _sparc64,	_noarch,_sparc,_sparcv8,_sparcv9 );
-	defCompatibleWith( _sparc64v,	_noarch,_sparc,_sparcv8,_sparcv9,_sparcv9v,_sparc64 );
+        defCompatibleWith( _sparc64(),		_noarch(),_sparc(),_sparcv8(),_sparcv9() );
+	defCompatibleWith( _sparc64v(),		_noarch(),_sparc(),_sparcv8(),_sparcv9(),_sparcv9v(),_sparc64() );
         //
-        defCompatibleWith( _armv3l,	_noarch );
-        defCompatibleWith( _armv4l,	_noarch,_armv3l );
-        defCompatibleWith( _armv4tl,	_noarch,_armv3l,_armv4l );
-        defCompatibleWith( _armv5l,	_noarch,_armv3l,_armv4l,_armv4tl );
-        defCompatibleWith( _armv5tel,	_noarch,_armv3l,_armv4l,_armv4tl,_armv5l );
-        defCompatibleWith( _armv5tejl,	_noarch,_armv3l,_armv4l,_armv4tl,_armv5l,_armv5tel );
-        defCompatibleWith( _armv6l,	_noarch,_armv3l,_armv4l,_armv4tl,_armv5l,_armv5tel,_armv5tejl );
-        defCompatibleWith( _armv7l,	_noarch,_armv3l,_armv4l,_armv4tl,_armv5l,_armv5tel,_armv5tejl,_armv6l );
-        defCompatibleWith( _armv7hl,    _noarch );
-        defCompatibleWith( _armv7nhl,   _noarch, _armv7hl );
+        defCompatibleWith( _armv3l(),		_noarch() );
+        defCompatibleWith( _armv4l(),		_noarch(),_armv3l() );
+        defCompatibleWith( _armv4tl(),		_noarch(),_armv3l(),_armv4l() );
+        defCompatibleWith( _armv5l(),		_noarch(),_armv3l(),_armv4l(),_armv4tl() );
+        defCompatibleWith( _armv5tel(),		_noarch(),_armv3l(),_armv4l(),_armv4tl(),_armv5l() );
+        defCompatibleWith( _armv5tejl(),	_noarch(),_armv3l(),_armv4l(),_armv4tl(),_armv5l(),_armv5tel() );
+        defCompatibleWith( _armv6l(),		_noarch(),_armv3l(),_armv4l(),_armv4tl(),_armv5l(),_armv5tel(),_armv5tejl() );
+        defCompatibleWith( _armv6hl(),		_noarch() );
+        defCompatibleWith( _armv7l(),		_noarch(),_armv3l(),_armv4l(),_armv4tl(),_armv5l(),_armv5tel(),_armv5tejl(),_armv6l() );
+        defCompatibleWith( _armv7hl(),		_noarch(),_armv6hl() );
+        defCompatibleWith( _armv7nhl(),		_noarch(),_armv7hl() );
+        defCompatibleWith( _armv7thl(),		_noarch(),_armv7hl() );
+        defCompatibleWith( _armv7tnhl(),	_noarch(),_armv7hl(),_armv7nhl(),_armv7thl() );
+        defCompatibleWith( _aarch64(),		_noarch() );
         //
-        defCompatibleWith( _sh3,	_noarch );
+        defCompatibleWith( _sh3(),		_noarch() );
         //
-        defCompatibleWith( _sh4,	_noarch );
-        defCompatibleWith( _sh4a,	_noarch,_sh4 );
+        defCompatibleWith( _sh4(),		_noarch() );
+        defCompatibleWith( _sh4a(),		_noarch(),_sh4() );
+
+        defCompatibleWith(_m68k(),		_noarch());
         //
         ///////////////////////////////////////////////////////////////////
         // dumpOn( USR ) << endl;
@@ -392,55 +414,7 @@ namespace zypp
   ///////////////////////////////////////////////////////////////////
 
   const Arch Arch_empty ( IdString::Empty );
-  const Arch Arch_noarch( _noarch );
-
-  const Arch Arch_i386( _i386 );
-  const Arch Arch_i486( _i486 );
-  const Arch Arch_i586( _i586 );
-  const Arch Arch_i686( _i686 );
-  const Arch Arch_athlon( _athlon );
-  const Arch Arch_x86_64( _x86_64 );
-
-  const Arch Arch_pentium3( _pentium3 );
-  const Arch Arch_pentium4( _pentium4 );
-
-  const Arch Arch_s390( _s390 );
-  const Arch Arch_s390x( _s390x );
-
-  const Arch Arch_ppc( _ppc );
-  const Arch Arch_ppc64( _ppc64 );
-
-  const Arch Arch_ia64( _ia64 );
-
-  const Arch Arch_alphaev67( _alphaev67 );
-  const Arch Arch_alphaev6( _alphaev6 );
-  const Arch Arch_alphapca56( _alphapca56 );
-  const Arch Arch_alphaev56( _alphaev56 );
-  const Arch Arch_alphaev5( _alphaev5 );
-  const Arch Arch_alpha( _alpha );
-
-  const Arch Arch_sparc64v( _sparc64v );
-  const Arch Arch_sparc64( _sparc64 );
-  const Arch Arch_sparcv9v( _sparcv9v );
-  const Arch Arch_sparcv9( _sparcv9 );
-  const Arch Arch_sparcv8( _sparcv8 );
-  const Arch Arch_sparc( _sparc );
-
-  const Arch Arch_armv7nhl ( _armv7nhl );
-  const Arch Arch_armv7hl ( _armv7hl );
-  const Arch Arch_armv7l( _armv7l );
-  const Arch Arch_armv6l( _armv6l );
-  const Arch Arch_armv5tejl( _armv5tejl );
-  const Arch Arch_armv5tel( _armv5tel );
-  const Arch Arch_armv5l( _armv5l );
-  const Arch Arch_armv4tl( _armv4tl );
-  const Arch Arch_armv4l( _armv4l );
-  const Arch Arch_armv3l( _armv3l );
-
-  const Arch Arch_sh3( _sh3 );
-
-  const Arch Arch_sh4( _sh4 );
-  const Arch Arch_sh4a( _sh4a );
+  // remaining Arch_* constants are defined by DEF_BUILTIN above.
 
   ///////////////////////////////////////////////////////////////////
   //
@@ -448,7 +422,7 @@ namespace zypp
   //	METHOD TYPE : Ctor
   //
   Arch::Arch()
-  : _entry( &ArchCompatSet::instance().assertDef( _noarch ) )
+  : _entry( &ArchCompatSet::instance().assertDef( _noarch() ) )
   {}
 
   Arch::Arch( IdString::IdType id_r )

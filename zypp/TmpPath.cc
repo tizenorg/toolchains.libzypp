@@ -82,6 +82,12 @@ namespace zypp {
         path() const
         { return _path; }
 
+        bool autoCleanup() const
+        { return( _flags & Autodelete ); }
+
+        void autoCleanup( bool yesno_r )
+	{ _flags = yesno_r ? CtorDefault : NoOp; }
+
       private:
         Pathname _path;
         Flags    _flags;
@@ -100,9 +106,7 @@ namespace zypp {
     //	METHOD TYPE : Constructor
     //
     TmpPath::TmpPath()
-    :_impl( 0 ) // empty Pathname
-    {
-    }
+    {}
 
     ///////////////////////////////////////////////////////////////////
     //
@@ -110,9 +114,8 @@ namespace zypp {
     //	METHOD TYPE : Constructor
     //
     TmpPath::TmpPath( const Pathname & tmpPath_r )
-    :_impl( tmpPath_r.empty() ? 0 : new Impl( tmpPath_r ) )
-    {
-    }
+    :_impl( tmpPath_r.empty() ? nullptr : new Impl( tmpPath_r ) )
+    {}
 
     ///////////////////////////////////////////////////////////////////
     //
@@ -129,7 +132,7 @@ namespace zypp {
     //      METHOD NAME : TmpPath::operator const void *
     //      METHOD TYPE :
     //
-    TmpPath::operator const void * () const
+    TmpPath::operator bool() const
     {
       return _impl.get();
     }
@@ -156,6 +159,13 @@ namespace zypp {
       static Pathname p( getenv("ZYPPTMPDIR") ? getenv("ZYPPTMPDIR") : "/var/tmp" );
       return p;
     }
+
+    bool TmpPath::autoCleanup() const
+    { return _impl.get() ? _impl->autoCleanup() : false; }
+
+    void TmpPath::autoCleanup( bool yesno_r )
+    { if ( _impl.get() ) _impl->autoCleanup( yesno_r ); }
+
     ///////////////////////////////////////////////////////////////////
     //
     //	CLASS NAME : TmpFile
@@ -187,7 +197,7 @@ namespace zypp {
           return;
         }
 
-      int tmpFd = ::mkstemp( buf );
+      int tmpFd = ::mkostemp( buf, O_CLOEXEC );
       if ( tmpFd != -1 )
         {
           // success; create _impl

@@ -40,10 +40,19 @@ MACRO( GETTEXT_CREATE_TARBALL_TRANSLATIONS _translation_set_basename )
         EXECUTE_PROCESS(
                 COMMAND tar tfj ${CMAKE_CURRENT_SOURCE_DIR}/${TRANSLATION_SET}
                 COMMAND sed -n "/\\.po$/s%.*/%%p"
-                COMMAND awk "{printf $1\";\"}"
+				OUTPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/translation_set_sed_output
+		)
+
+        EXECUTE_PROCESS(
+                COMMAND awk "{printf $1\";\"}" ${CMAKE_CURRENT_SOURCE_DIR}/translation_set_sed_output
                 OUTPUT_VARIABLE TRANSLATION_SET_CONTENT
         )
         MESSAGE( STATUS "Translations: ${TRANSLATION_SET_CONTENT}" )
+
+        EXECUTE_PROCESS(
+                COMMAND rm ${CMAKE_CURRENT_SOURCE_DIR}/translation_set_sed_output
+				OUTPUT_QUIET
+        )
 
         # Create 'LANG.po's from po.tar.bz2
         ADD_CUSTOM_COMMAND(

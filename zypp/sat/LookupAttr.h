@@ -31,12 +31,11 @@ namespace zypp
   class CheckSum;
   class Match;
   class MatchException;
+  class StrMatcher;
 
   ///////////////////////////////////////////////////////////////////
   namespace sat
   { /////////////////////////////////////////////////////////////////
-
-    class AttrMatcher;
 
     ///////////////////////////////////////////////////////////////////
     //
@@ -179,41 +178,41 @@ namespace zypp
         /** \name Restrict attributes to match a pattern. */
         //@{
         /** The pattern to match.
-         * You can also evaluate \ref AttrMatcher in a boolean context,
-         * in order to test whether an \ref AttrMatcher is set:
+         * You can also evaluate \ref StrMatcher in a boolean context,
+         * in order to test whether an \ref StrMatcher is set:
          * \code
          *   LookupAttr q;
-         *   if ( q.attrMatcher() )
-         *     ...; // an AttrMatcher is set
+         *   if ( q.strMatcher() )
+         *     ...; // an StrMatcher is set
          * \endcode
         */
-        const AttrMatcher & attrMatcher() const;
+        const StrMatcher & strMatcher() const;
 
         /** Set the pattern to match.
-         * \throws MatchException Any of the exceptions thrown by \ref AttrMatcher::compile.
+         * \throws MatchException Any of the exceptions thrown by \ref StrMatcher::compile.
          */
-        void setAttrMatcher( const AttrMatcher & matcher_r );
+        void setStrMatcher( const StrMatcher & matcher_r );
 
         /** Reset the pattern to match. */
-        void resetAttrMatcher();
+        void resetStrMatcher();
        //@}
 
       public:
         /** \name Where to search. */
         //@{
-        /** Wheter to search in \ref Pool. */
+        /** Whether to search in \ref Pool. */
         bool pool() const;
 
         /** Set search in \ref Pool (all repositories). */
         void setPool( Location = SOLV_ATTR );
 
-        /** Wheter to search in one \ref Repository. */
+        /** Whether to search in one \ref Repository. */
         Repository repo() const;
 
         /** Set search in one \ref Repository. */
         void setRepo( Repository repo_r, Location = SOLV_ATTR );
 
-        /** Wheter to search in one \ref Solvable. */
+        /** Whether to search in one \ref Solvable. */
         Solvable solvable() const;
 
         /** Set search in one \ref Solvable. */
@@ -293,7 +292,7 @@ namespace zypp
        * Also maintains a copy of the matchstring in order to
        * keep the char* passed to the dataiterator valid.
        */
-      class DIWrap : private base::SafeBool<DIWrap>
+      class DIWrap
       {
         public:
           /** \c NULL \c ::_Dataiterator */
@@ -326,19 +325,16 @@ namespace zypp
           void reset()
           { DIWrap().swap( *this ); }
         public:
-#ifndef SWIG // Swig treats it as syntax error
           /** Evaluate in a boolean context <tt>( _dip != NULL )</tt>. */
-          using base::SafeBool<DIWrap>::operator bool_type;
-#endif
+          explicit operator bool() const
+          { return _dip; }
+
         public:
           ::_Dataiterator * operator->() const  { return _dip; }
           ::_Dataiterator * get()        const  { return _dip; }
           const std::string & getstr()   const  { return _mstring; }
-        private:
-          friend base::SafeBool<DIWrap>::operator bool_type() const;
-          bool boolTest() const
-          { return _dip; }
-        private:
+
+	private:
           ::_Dataiterator * _dip;
           std::string _mstring;
       };
@@ -437,7 +433,7 @@ namespace zypp
          *
          * These are usable iff \ref solvAttrSubEntry is \c true.
          *
-         * \note Unfortunately the underlying satsolver dataiterator as returned
+         * \note Unfortunately the underlying libsolv dataiterator as returned
          * by \ref subBegin and \ref subFind loses some context when being created.
          * Thus it's not possible to invoke \ref subBegin and \ref subFind on an
          * iterator that was previously returned by one of those methods. The result
@@ -463,7 +459,7 @@ namespace zypp
          * \endcode
          */
         //@{
-        /** Wheter the sub-structure is empty. */
+        /** Whether the sub-structure is empty. */
         bool subEmpty() const;
 
         /** Ammount of attributes in the sub-structure.
@@ -502,6 +498,8 @@ namespace zypp
         unsigned asUnsigned() const;
         /** \overload */
         bool asBool() const;
+        /** \overload */
+        unsigned long long asUnsignedLL() const;
 
         /** Conversion to string types. */
         const char * c_str() const;
@@ -586,6 +584,7 @@ namespace zypp
     //@{
     template<> inline int          LookupAttr::iterator::asType<int>()          const { return asInt(); }
     template<> inline unsigned     LookupAttr::iterator::asType<unsigned>()     const { return asUnsigned(); }
+    template<> inline unsigned long long LookupAttr::iterator::asType<unsigned long long>()     const { return asUnsignedLL(); }
     template<> inline bool         LookupAttr::iterator::asType<bool>()         const { return asBool(); }
     template<> inline const char * LookupAttr::iterator::asType<const char *>() const { return c_str(); }
     template<> inline std::string  LookupAttr::iterator::asType<std::string>()  const { return asString(); }

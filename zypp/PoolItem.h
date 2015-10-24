@@ -137,8 +137,8 @@ namespace zypp
 
       /** Conversion to bool to allow pointer style tests
        *  for nonNULL \ref resolvable. */
-      operator ResObject::constPtr::unspecified_bool_type() const
-      { return resolvable(); }
+      explicit operator bool() const
+      { return bool(resolvable()); }
 
     private:
       friend class Impl;

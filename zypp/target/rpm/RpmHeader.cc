@@ -285,6 +285,11 @@ bool RpmHeader::isSrc() const
   return has_tag( RPMTAG_SOURCEPACKAGE );
 }
 
+bool RpmHeader::isNosrc() const
+{
+  return has_tag( RPMTAG_SOURCEPACKAGE ) && ( has_tag( RPMTAG_NOSOURCE ) || has_tag( RPMTAG_NOPATCH ) );
+}
+
 ///////////////////////////////////////////////////////////////////
 //
 //
@@ -422,6 +427,32 @@ CapabilitySet RpmHeader::PkgRelList_val( tag tag_r, bool pre, std::set<std::stri
       kindFlags   = RPMTAG_CONFLICTFLAGS;
       kindVersion = RPMTAG_CONFLICTVERSION;
       break;
+#ifdef RPMTAG_OLDSUGGESTS
+    case RPMTAG_OLDENHANCESNAME:
+      kindFlags   = RPMTAG_OLDENHANCESFLAGS;
+      kindVersion = RPMTAG_OLDENHANCESVERSION;
+      break;
+    case RPMTAG_OLDSUGGESTSNAME:
+      kindFlags   = RPMTAG_OLDSUGGESTSFLAGS;
+      kindVersion = RPMTAG_OLDSUGGESTSVERSION;
+      break;
+    case RPMTAG_RECOMMENDNAME:
+      kindFlags   = RPMTAG_RECOMMENDFLAGS;
+      kindVersion = RPMTAG_RECOMMENDVERSION;
+      break;
+    case RPMTAG_SUPPLEMENTNAME:
+      kindFlags   = RPMTAG_SUPPLEMENTFLAGS;
+      kindVersion = RPMTAG_SUPPLEMENTVERSION;
+      break;
+    case RPMTAG_SUGGESTNAME:
+      kindFlags   = RPMTAG_SUGGESTFLAGS;
+      kindVersion = RPMTAG_SUGGESTVERSION;
+      break;
+    case RPMTAG_ENHANCENAME:
+      kindFlags   = RPMTAG_ENHANCEFLAGS;
+      kindVersion = RPMTAG_ENHANCEVERSION;
+      break;
+#else
     case RPMTAG_ENHANCESNAME:
       kindFlags   = RPMTAG_ENHANCESFLAGS;
       kindVersion = RPMTAG_ENHANCESVERSION;
@@ -430,6 +461,7 @@ CapabilitySet RpmHeader::PkgRelList_val( tag tag_r, bool pre, std::set<std::stri
       kindFlags   = RPMTAG_SUGGESTSFLAGS;
       kindVersion = RPMTAG_SUGGESTSVERSION;
       break;
+#endif
     default:
       INT << "Illegal RPMTAG_dependencyNAME " << tag_r << endl;
       return ret;
@@ -581,7 +613,11 @@ CapabilitySet RpmHeader::tag_obsoletes( std::set<std::string> * freq_r ) const
 //
 CapabilitySet RpmHeader::tag_enhances( std::set<std::string> * freq_r ) const
   {
+#ifdef RPMTAG_OLDSUGGESTS
+    return PkgRelList_val( RPMTAG_ENHANCENAME, false, freq_r );
+#else
     return PkgRelList_val( RPMTAG_ENHANCESNAME, false, freq_r );
+#endif
   }
 
 ///////////////////////////////////////////////////////////////////
@@ -594,7 +630,45 @@ CapabilitySet RpmHeader::tag_enhances( std::set<std::string> * freq_r ) const
 //
 CapabilitySet RpmHeader::tag_suggests( std::set<std::string> * freq_r ) const
   {
+#ifdef RPMTAG_OLDSUGGESTS
+    return PkgRelList_val( RPMTAG_SUGGESTNAME, false, freq_r );
+#else
     return PkgRelList_val( RPMTAG_SUGGESTSNAME, false, freq_r );
+#endif
+  }
+
+///////////////////////////////////////////////////////////////////
+//
+//
+//        METHOD NAME : RpmHeader::tag_supplements
+//        METHOD TYPE : CapabilitySet
+//
+//        DESCRIPTION :
+//
+CapabilitySet RpmHeader::tag_supplements( std::set<std::string> * freq_r ) const
+  {
+#ifdef RPMTAG_OLDSUGGESTS
+    return PkgRelList_val( RPMTAG_SUPPLEMENTNAME, false, freq_r );
+#else
+    return CapabilitySet();
+#endif
+  }
+
+///////////////////////////////////////////////////////////////////
+//
+//
+//        METHOD NAME : RpmHeader::tag_recommends
+//        METHOD TYPE : CapabilitySet
+//
+//        DESCRIPTION :
+//
+CapabilitySet RpmHeader::tag_recommends( std::set<std::string> * freq_r ) const
+  {
+#ifdef RPMTAG_OLDSUGGESTS
+    return PkgRelList_val( RPMTAG_RECOMMENDNAME, false, freq_r );
+#else
+    return CapabilitySet();
+#endif
   }
 
 ///////////////////////////////////////////////////////////////////
@@ -751,59 +825,44 @@ std::string RpmHeader::tag_url() const
 std::string RpmHeader::tag_os() const
 {
   return string_val( RPMTAG_OS );
+
 }
 
-///////////////////////////////////////////////////////////////////
-//
-//
-//        METHOD NAME : RpmHeader::tag_prein
-//        METHOD TYPE : std::string
-//
-//        DESCRIPTION :
-//
 std::string RpmHeader::tag_prein() const
-{
-  return string_val( RPMTAG_PREIN );
-}
+{ return string_val( RPMTAG_PREIN ); }
 
-///////////////////////////////////////////////////////////////////
-//
-//
-//        METHOD NAME : RpmHeader::tag_postin
-//        METHOD TYPE : std::string
-//
-//        DESCRIPTION :
-//
+std::string RpmHeader::tag_preinprog() const
+{ return string_val( RPMTAG_PREINPROG ); }
+
 std::string RpmHeader::tag_postin() const
-{
-  return string_val( RPMTAG_POSTIN );
-}
+{ return string_val( RPMTAG_POSTIN ); }
 
-///////////////////////////////////////////////////////////////////
-//
-//
-//        METHOD NAME : RpmHeader::tag_preun
-//        METHOD TYPE : std::string
-//
-//        DESCRIPTION :
-//
+std::string RpmHeader::tag_postinprog() const
+{ return string_val( RPMTAG_POSTINPROG ); }
+
 std::string RpmHeader::tag_preun() const
-{
-  return string_val( RPMTAG_PREUN );
-}
+{ return string_val( RPMTAG_PREUN ); }
 
-///////////////////////////////////////////////////////////////////
-//
-//
-//        METHOD NAME : RpmHeader::tag_postun
-//        METHOD TYPE : std::string
-//
-//        DESCRIPTION :
-//
+std::string RpmHeader::tag_preunprog() const
+{ return string_val( RPMTAG_PREUNPROG ); }
+
 std::string RpmHeader::tag_postun() const
-{
-  return string_val( RPMTAG_POSTUN );
-}
+{ return string_val( RPMTAG_POSTUN ); }
+
+std::string RpmHeader::tag_postunprog() const
+{ return string_val( RPMTAG_POSTUNPROG ); }
+
+std::string RpmHeader::tag_pretrans() const
+{ return string_val( RPMTAG_PRETRANS ); }
+
+std::string RpmHeader::tag_pretransprog() const
+{ return string_val( RPMTAG_PRETRANSPROG ); }
+
+std::string RpmHeader::tag_posttrans() const
+{ return string_val( RPMTAG_POSTTRANS ); }
+
+std::string RpmHeader::tag_posttransprog() const
+{ return string_val( RPMTAG_POSTTRANSPROG ); }
 
 ///////////////////////////////////////////////////////////////////
 //
@@ -914,9 +973,9 @@ std::list<FileInfo> RpmHeader::tag_fileinfos() const
                         md5sums[i],
                         uid,
                         gid,
-                        filemodes[i],
+                        mode_t(filemodes[i]),
                         filemtimes[i],
-                        fileflags[i] & RPMFILE_GHOST,
+                        bool(fileflags[i] & RPMFILE_GHOST),
                         filelinks[i]
                       };
 
@@ -953,108 +1012,6 @@ Changelog RpmHeader::tag_changelog() const
   }
 
   return ret;
-}
-
-///////////////////////////////////////////////////////////////////
-//
-//
-//        METHOD NAME : RpmHeader::tag_du
-//        METHOD TYPE : PkgDu &
-//
-//        DESCRIPTION :
-//
-DiskUsage & RpmHeader::tag_du( DiskUsage & dudata_r ) const
-{
-  dudata_r.clear();
-  stringList basenames;
-  if ( string_list( RPMTAG_BASENAMES, basenames ) )
-  {
-    stringList dirnames;
-    string_list( RPMTAG_DIRNAMES, dirnames );
-    intList dirindexes;
-    int_list( RPMTAG_DIRINDEXES, dirindexes );
-
-    intList filedevices;
-    int_list( RPMTAG_FILEDEVICES, filedevices );
-    intList fileinodes;
-    int_list( RPMTAG_FILEINODES, fileinodes );
-    intList filesizes;
-    int_list( RPMTAG_FILESIZES, filesizes );
-    intList filemodes;
-    int_list( RPMTAG_FILEMODES, filemodes );
-
-    ///////////////////////////////////////////////////////////////////
-    // Create and collect Entries by index. devino_cache is used to
-    // filter out hardliks ( different name but same device and inode ).
-    ///////////////////////////////////////////////////////////////////
-    filesystem::DevInoCache trace;
-    std::vector<DiskUsage::Entry> entries;
-    entries.resize( dirnames.size() );
-    for ( unsigned i = 0; i < dirnames.size(); ++i )
-    {
-      entries[i] = DiskUsage::Entry( dirnames[i] );
-
-      // cut off deeper directory levels in DiskUsage::Entry
-      unsigned level             = 3; // number of '/' incl. a trailing one
-      std::string::size_type pos = 0; // we know rpm stores absolute pathnames
-      while ( --level && pos != std::string::npos )
-      {
-        pos = entries[i].path.find( "/", pos+1 );
-      }
-      if ( pos != std::string::npos )
-      {
-        entries[i].path.erase( pos+1 );
-      }
-    }
-
-    for ( unsigned i = 0; i < basenames.size(); ++ i )
-    {
-      filesystem::StatMode mode( filemodes[i] );
-      if ( mode.isFile() )
-      {
-        if ( trace.insert( filedevices[i], fileinodes[i] ) )
-        {
-          // Count full 1K blocks
-          entries[dirindexes[i]]._size += ByteCount( filesizes[i] ).blocks( ByteCount::K );
-          ++(entries[dirindexes[i]]._files);
-        }
-        // else: hardlink; already counted this device/inode
-      }
-    }
-
-    ///////////////////////////////////////////////////////////////////
-    // Collect all enties. We first unify the duplicate entries that
-    // were created by cutting off deeper levels. Then the size of each
-    // directory must also be added to each of it's parent directories.
-    ///////////////////////////////////////////////////////////////////
-    DiskUsage tmpdata;
-    for ( unsigned i = 0; i < entries.size(); ++i )
-    {
-      if ( entries[i]._size )
-        tmpdata.add( entries[i] );
-    }
-
-    for_( it, tmpdata.begin(), tmpdata.end() )
-    {
-      DiskUsage::Entry ent( *it );
-
-      do {
-        dudata_r.add( ent );
-        if ( ent.path.size() <= 1 ) // "" or "/"
-          break;
-
-        // set path to parent dir. Note that DiskUsage::Entry
-        // has leading and trailing '/' on pathnmes.
-        std::string::size_type rstart = ent.path.size() - 2;           // trailing '/' !
-        std::string::size_type lpos   = ent.path.rfind( '/', rstart ); // one but last '/'
-        if ( lpos == std::string::npos )
-          break;
-
-        ent.path.erase( lpos + 1 );
-      } while( true );
-    }
-  }
-  return dudata_r;
 }
 
 } // namespace rpm

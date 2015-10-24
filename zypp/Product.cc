@@ -11,6 +11,7 @@
 */
 #include <iostream>
 #include "zypp/base/LogTools.h"
+#include "zypp/base/StrMatcher.h"
 
 #include "zypp/Product.h"
 #include "zypp/Url.h"
@@ -94,6 +95,24 @@ namespace zypp
           found = *it;
       }
     }
+
+    if ( ! found && isSystem() )
+    {
+      // bnc#784900: for installed products check whether the file is owned by
+      // some package. If so, ust this as buddy.
+      sat::LookupAttr q( sat::SolvAttr::filelist, repository() );
+      std::string refFile( referenceFilename() );
+      if ( ! refFile.empty() )
+      {
+	StrMatcher matcher( referenceFilename() );
+	q.setStrMatcher( matcher );
+	if ( ! q.empty() )
+	  found = q.begin().inSolvable();
+      }
+      else
+	INT << "Product referenceFilename unexpectedly empty!" << endl;
+    }
+
     if ( ! found )
       WAR << *this << ": no reference package found: " << identCap << endl;
     return found;
@@ -137,7 +156,12 @@ namespace zypp
   ///////////////////////////////////////////////////////////////////
 
   std::string Product::shortName() const
-  { return lookupStrAttribute( sat::SolvAttr::productShortlabel ); }
+  {
+    std::string ret( lookupStrAttribute( sat::SolvAttr::productShortlabel ) );
+    if ( ret.empty() ) ret = name();
+    return ret;
+
+  }
 
   std::string Product::flavor() const
   {
@@ -176,6 +200,19 @@ namespace zypp
     std::list<std::string> ret;
     fillList( ret, satSolvable(), sat::SolvAttr::productFlags );
     return ret;
+  }
+
+  Date Product::endOfLife() const
+  { return Date( lookupNumAttribute( sat::SolvAttr::productEndOfLife ) );}
+
+  unsigned Product::updateContentIdentifierSize( std::list<Repository::ContentIdentifier> & ret_r ) const
+  {
+    sat::LookupAttr q( sat::SolvAttr::productUpdatesRepoid, sat::SolvAttr::productUpdates, *this );
+    for_( it, q.begin(), q.end() )
+    {
+      ret_r.push_back( it.asString() );
+    }
+    return q.size();
   }
 
   bool Product::isTargetDistribution() const

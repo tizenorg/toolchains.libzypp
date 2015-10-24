@@ -13,11 +13,11 @@
 #define ZYPP_SAT_DETAIL_POOLIMPL_H
 extern "C"
 {
-#include <satsolver/pool.h>
-#include <satsolver/repo.h>
-#include <satsolver/solvable.h>
-#include <satsolver/poolarch.h>
-#include <satsolver/repo_solv.h>
+#include <solv/pool.h>
+#include <solv/repo.h>
+#include <solv/solvable.h>
+#include <solv/poolarch.h>
+#include <solv/repo_solv.h>
 }
 #include <iosfwd>
 
@@ -25,6 +25,7 @@ extern "C"
 #include "zypp/base/NonCopyable.h"
 #include "zypp/base/SerialNumber.h"
 #include "zypp/sat/detail/PoolMember.h"
+#include "zypp/sat/Queue.h"
 #include "zypp/RepoInfo.h"
 #include "zypp/Locale.h"
 #include "zypp/Capability.h"
@@ -67,6 +68,8 @@ namespace zypp
            * \todo actually requires a watcher.
            */
           void prepare() const;
+	  /** \ref prepare plus some expensive checks done before solving only. */
+	  void prepareForSolving() const;
 
         private:
           /** Invalidate housekeeping data (e.g. whatprovides) if the
@@ -245,21 +248,21 @@ namespace zypp
         public:
           /** \name Installed on behalf of a user request hint. */
           //@{
-          typedef IdStringSet OnSystemByUserList;
+          /** Get ident list of all autoinstalled solvables. */
+	  StringQueue autoInstalled() const
+	  { return _autoinstalled; }
 
-          const OnSystemByUserList & onSystemByUserList() const
-          {
-            if ( ! _onSystemByUserListPtr )
-	      onSystemByUserListInit();
-	    return *_onSystemByUserListPtr;
-          }
+	  /** Set ident list of all autoinstalled solvables. */
+	  void setAutoInstalled( const StringQueue & autoInstalled_r )
+	  { _autoinstalled = autoInstalled_r; }
 
           bool isOnSystemByUser( IdString ident_r ) const
-          {
-            const OnSystemByUserList & l( onSystemByUserList() );
-            return l.find( ident_r ) != l.end();
-          }
+          { return !_autoinstalled.contains( ident_r.id() ); }
           //@}
+
+	public:
+	  /** accessor for etc/sysconfig/storage reading file on demand */
+	  const std::set<std::string> & requiredFilesystems() const;
 
         private:
           /** sat-pool. */
@@ -281,8 +284,10 @@ namespace zypp
           mutable scoped_ptr<MultiversionList> _multiversionListPtr;
 
           /**  */
-          void onSystemByUserListInit() const;
-          mutable scoped_ptr<OnSystemByUserList> _onSystemByUserListPtr;
+	  sat::StringQueue _autoinstalled;
+
+	  /** filesystems mentioned in /etc/sysconfig/storage */
+	  mutable scoped_ptr<std::set<std::string> > _requiredFilesystemsPtr;
       };
       ///////////////////////////////////////////////////////////////////
 

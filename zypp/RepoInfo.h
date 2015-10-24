@@ -16,7 +16,7 @@
 #include <set>
 
 #include "zypp/base/Iterator.h"
-#include "zypp/base/Deprecated.h"
+#include "zypp/APIConfig.h"
 
 #include "zypp/Url.h"
 #include "zypp/Locale.h"
@@ -132,7 +132,6 @@ namespace zypp
       /**
        * Add a base url. \see baseUrls
        * \param url The base url for the repository.
-       * \note can change keepPackages,so change it after this call
        *
        * To recreate the base URLs list, use \ref setBaseUrl(const Url &) followed
        * by addBaseUrl().
@@ -140,7 +139,6 @@ namespace zypp
       void addBaseUrl( const Url &url );
       /**
        * Clears current base URL list and adds \a url.
-       * \note can change keepPackages,so change it after this call
        */
       void setBaseUrl( const Url &url );
 
@@ -269,11 +267,11 @@ namespace zypp
       void setGpgKeyUrl( const Url &gpgkey );
 
       /**
-       * \short Whether to keep the packages downloaded from this repository will be kept in local cache
+       * \short Whether packages downloaded from this repository will be kept in local cache
        */
       bool keepPackages() const;
       /**
-       * \short Set if the packaqes downloaded from this repository will be kept in local cache
+       * \short Set if packaqes downloaded from this repository will be kept in local cache
        *
        * If the setting is true, all downloaded packages from this repository will be
        * copied to the local raw cache.
@@ -304,12 +302,51 @@ namespace zypp
        */
       void setTargetDistribution(const std::string & targetDistribution);
 
+      /** Add content keywords */
+      void addContent( const std::string & keyword_r );
+      /** \overload add keywords from container */
+      template <class _Iterator>
+      void addContentFrom( _Iterator begin_r, _Iterator end_r )
+      { for_( it, begin_r, end_r ) addContent( *it ); }
+      /** \overload  */
+      template <class _Container>
+      void addContentFrom( const _Container & container_r )
+      { addContentFrom( container_r.begin(), container_r.end() ); }
+
+      /** Check for content keywords.
+       * Checking for an empty string returns whether content kewords are
+       * known at all. They may be missing due to missing metadata in disabled
+       * repos.
+       */
+      bool hasContent( const std::string & keyword_r = std::string() ) const;
+      /** \overload check for \b all keywords being present */
+      template <class _Iterator>
+      bool hasContentAll( _Iterator begin_r, _Iterator end_r ) const
+      { for_( it, begin_r, end_r ) if ( ! hasContent( *it ) ) return false; return true; }
+      /** \overload  */
+      template <class _Container>
+      bool hasContentAll( const _Container & container_r ) const
+      { return hasContentAll( container_r.begin(), container_r.end() ); }
+      /** \overload check for \b any keyword being present */
+      template <class _Iterator>
+      bool hasContentAny( _Iterator begin_r, _Iterator end_r ) const
+      { for_( it, begin_r, end_r ) if ( hasContent( *it ) ) return true; return false; }
+      /** \overload  */
+      template <class _Container>
+      bool hasContentAny( const _Container & container_r ) const
+      { return hasContentAny( container_r.begin(), container_r.end() ); }
+
     public:
       /** \name Repository license
       */
       //@{
       /** Whether there is a license associated with the repo. */
       bool hasLicense() const;
+
+      /** Whether the repo license has to be accepted, e.g. there is no
+       * no acceptance needed for openSUSE.
+       */
+      bool needToAcceptLicense() const;
 
       /** Return the best license for the current (or a specified) locale. */
       std::string getLicense( const Locale & lang_r = Locale() );
@@ -342,17 +379,15 @@ namespace zypp
 
       /**
        * Write an XML representation of this RepoInfo object.
-       */
-      virtual std::ostream & dumpAsXMLOn(std::ostream & str) const;
-
-      /**
-       * Write an XML representation of this RepoInfo object.
        *
        * \param str
        * \param content this argument is ignored (used in other classed derived
        *                from RepoInfoBase.
        */
-      virtual std::ostream & dumpAsXMLOn( std::ostream & str, const std::string & content ) const;
+      virtual std::ostream & dumpAsXmlOn( std::ostream & str, const std::string & content = "" ) const;
+
+      /** \deprecated Use camel cased dumpAsXmlOn */
+      ZYPP_DEPRECATED std::ostream & dumpAsXMLOn( std::ostream & str, const std::string & content = "" ) const { return dumpAsXmlOn( str, content ); }
 
       class Impl;
     private:

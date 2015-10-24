@@ -81,7 +81,7 @@ namespace zypp
     std::string productLine() const;
 
   public:
-    /** Untranslated short name like <tt>SLES 10</tt>*/
+    /** Untranslated short name like <tt>SLES 10</tt> (fallback: name) */
     std::string shortName() const;
 
     /** The product flavor (LiveCD Demo, FTP edition,...). */
@@ -91,13 +91,19 @@ namespace zypp
      * Well, in an ideal world there is only one base product.
      * It's the installed product denoted by a symlink in
      * \c /etc/products.d.
-     * \deprecated Use isTargetDistribution to test for the installed base product,
-     * other wise type is empty for almost all products.
-    */
-    std::string type() const ZYPP_DEPRECATED;
+     */
+    std::string type() const;
 
     /** The product flags */
     std::list<std::string> flags() const;
+
+    /** The date when this Product goes out of support as indicated by it's medadata. */
+    Date endOfLife() const;
+
+    /** ContentIdentifier of required update repositories.
+     * \todo remove and provide iterator.
+     */
+    unsigned updateContentIdentifierSize( std::list<Repository::ContentIdentifier> & ret_r ) const;
 
   public:
     /** This is the \b installed product that is also targeted by the
@@ -105,8 +111,8 @@ namespace zypp
     */
     bool isTargetDistribution() const;
 
-    /** This is \c register.target attribute of an \b installed product.
-      * Used for registration.
+    /** This is \c register.target attribute of a product.
+      * Used for registration and filtering service repos.
       */
     std::string registerTarget() const;
 

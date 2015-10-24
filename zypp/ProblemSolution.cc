@@ -42,7 +42,8 @@ operator<<( ostream& os, const ProblemSolution & solution)
 {
     os << "Solution:" << endl;
     os << solution._description << endl;
-    os << solution._details << endl;
+    if ( ! solution._details.empty() )
+      os << solution._details << endl;
     os << solution._actions;
     return os;
 }
@@ -51,7 +52,7 @@ ostream&
 operator<<( ostream& os, const ProblemSolutionList & solutionlist)
 {
     for (ProblemSolutionList::const_iterator iter = solutionlist.begin(); iter != solutionlist.end(); ++iter) {
-	os << *(*iter) << endl;
+	os << *(*iter);
     }
     return os;
 }
@@ -96,17 +97,18 @@ ProblemSolution::apply (solver::detail::Resolver & resolver)
 	solver::detail::SolutionAction_constPtr action = *iter;
 	if (! action->execute (resolver))
 	{
+	    WAR << "apply solution action failed: " << action << endl;
 	    ret = false;
 	    break;
 	}
     }
-    return true;
+    return ret;
 }
 
 
 /**
  * Add an action to the actions list.
- **/ 
+ **/
 void
 ProblemSolution::addAction (solver::detail::SolutionAction_constPtr action)
 {

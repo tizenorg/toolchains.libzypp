@@ -16,7 +16,7 @@
 #include <set>
 #include <string>
 
-#include "zypp/base/Deprecated.h"
+#include "zypp/APIConfig.h"
 #include "zypp/base/NonCopyable.h"
 #include "zypp/base/PtrTypes.h"
 
@@ -52,6 +52,7 @@ namespace zypp
    *
    * namespace_settingName()
    *
+   * \ingroup ZyppConfig
    * \ingroup Singleton
   */
   class ZConfig : private base::NonCopyable
@@ -106,6 +107,24 @@ namespace zypp
       /** Reset the locale for translated texts to the default. */
       void resetTextLocale()
       { setTextLocale( defaultTextLocale() ); }
+
+    public:
+      /** \name Maintain user data
+       * \see \ref zypp-userdata
+       */
+      //@{
+      /** Whether a (non empty) user data sting is defined. */
+      bool hasUserData() const;
+
+      /** User defined string value to be passed to log, history, plugins... */
+      std::string userData() const;
+
+      /** Set a new \ref userData string.
+       * \returns \c TRUE if the string was accepted; \c FALSE if the
+       * string was rejected due to nonprintable characters or newlines.
+       */
+      bool setUserData( const std::string & str_r );
+      //@}
 
     public:
       /**
@@ -163,6 +182,11 @@ namespace zypp
       unsigned repo_refresh_delay() const;
 
       /**
+       * List of locales for which translated package descriptions should be downloaded.
+       */
+      LocaleSet repoRefreshLocales() const;
+
+      /**
        * Whether to use repository alias or name in user messages (progress,
        * exceptions, ...).
        * True: use alias, false: use name.
@@ -198,6 +222,11 @@ namespace zypp
        * Maximum silent tries
        */
       long download_max_silent_tries() const;
+
+      /**
+       * Maximum time in seconds that you allow a transfer operation to take.
+       */
+      long download_transfer_timeout() const;
 
 
       /** Whether to consider using a deltarpm when downloading a package.
@@ -295,6 +324,8 @@ namespace zypp
        */
       //@{
       const std::set<std::string> & multiversionSpec() const;
+      void multiversionSpec( std::set<std::string> new_r );
+      void clearMultiversionSpec();
       void addMultiversionSpec( const std::string & name_r );
       void removeMultiversionSpec( const std::string & name_r );
       //@}

@@ -16,8 +16,6 @@
 #include <tr1/unordered_set>
 #include <tr1/unordered_map>
 
-#include "zypp/base/PtrTypes.h"
-
 /** Define hash function for id based classes.
  * Class has to provide a method \c id() retuning a unique number.
  * \code
@@ -36,20 +34,26 @@ namespace std { namespace tr1 {              \
 }}
 
 ///////////////////////////////////////////////////////////////////
-namespace zypp
+namespace std
 { /////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////
+  namespace tr1
+  { /////////////////////////////////////////////////////////////////
 
-  /** clone function for RW_pointer */
-  template<class _D>
-  inline std::tr1::unordered_set<_D> * rwcowClone( const std::tr1::unordered_set<_D> * rhs )
-  { return new std::tr1::unordered_set<_D>( *rhs ); }
+    /** clone function for RW_pointer */
+    template<class _D>
+    inline unordered_set<_D> * rwcowClone( const std::tr1::unordered_set<_D> * rhs )
+    { return new std::tr1::unordered_set<_D>( *rhs ); }
 
-  /** clone function for RW_pointer */
-  template<class _K, class _V>
-  inline std::tr1::unordered_map<_K,_V> * rwcowClone( const std::tr1::unordered_map<_K,_V> * rhs )
-  { return new std::tr1::unordered_map<_K,_V>( *rhs ); }
+    /** clone function for RW_pointer */
+    template<class _K, class _V>
+    inline std::tr1::unordered_map<_K,_V> * rwcowClone( const std::tr1::unordered_map<_K,_V> * rhs )
+    { return new std::tr1::unordered_map<_K,_V>( *rhs ); }
 
+    /////////////////////////////////////////////////////////////////
+  } // namespace tr1
+  ///////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
-} // namespace zypp
+} // namespace std
 ///////////////////////////////////////////////////////////////////
 #endif // ZYPP_BASE_TR1HASH_H

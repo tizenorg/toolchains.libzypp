@@ -38,14 +38,14 @@ namespace zypp
     PathInfo h_info(curlrcFile.dirname(), PathInfo::LSTAT);
     PathInfo c_info(curlrcFile,           PathInfo::LSTAT);
 
-    if( h_info.isDir()  && h_info.owner() == getuid() &&
-        c_info.isFile() && c_info.owner() == getuid())
+    if( h_info.isDir()  && h_info.userMayRX() &&
+        c_info.isFile() && c_info.userMayR() )
     {
       MIL << "Going to parse " << curlrcFile << endl;
     }
     else
     {
-      char buf[32] = {NULL};
+      char buf[32] = "";
       WAR << "Not allowed to parse '" << curlrcFile
           << "': dir/file owner: " << h_info.owner() << "/" << c_info.owner()
           << ", process uid: " << getuid()

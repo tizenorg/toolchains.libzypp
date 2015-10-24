@@ -24,11 +24,20 @@
 #include "zypp/sat/Pool.h"
 #include "zypp/PoolItem.h"
 
+#include "zypp/ZYppCallbacks.h"	// JobReport::instance
+
 using std::endl;
 
 ///////////////////////////////////////////////////////////////////
 namespace zypp
 { /////////////////////////////////////////////////////////////////
+
+  callback::SendReport<JobReport> & JobReport::instance()
+  {
+    static callback::SendReport<JobReport> _report;
+    return _report;
+  }
+
   ///////////////////////////////////////////////////////////////////
   namespace zypp_detail
   { /////////////////////////////////////////////////////////////////
@@ -122,6 +131,8 @@ namespace zypp
      * and target used for transact. */
     ZYppCommitResult ZYppImpl::commit( const ZYppCommitPolicy & policy_r )
     {
+      setenv( "ZYPP_IS_RUNNING", str::numstring(getpid()).c_str(), 1 );
+
       if ( getenv("ZYPP_TESTSUITE_FAKE_ARCH") )
       {
         ZYPP_THROW( Exception("ZYPP_TESTSUITE_FAKE_ARCH set. Commit not allowed and disabled.") );
@@ -158,6 +169,13 @@ namespace zypp
       if (! _target)
         ZYPP_THROW( Exception("Target not initialized.") );
       _target->_pimpl->installSrcPackage( srcPackage_r );
+    }
+
+    ManagedFile ZYppImpl::provideSrcPackage( const SrcPackage_constPtr & srcPackage_r )
+    {
+      if (! _target)
+        ZYPP_THROW( Exception("Target not initialized.") );
+      return _target->_pimpl->provideSrcPackage( srcPackage_r );
     }
 
     //------------------------------------------------------------------------

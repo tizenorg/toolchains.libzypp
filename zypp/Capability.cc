@@ -148,20 +148,20 @@ namespace zypp
       if ( split.kind() == ResKind::srcpackage )
       {
         // map 'kind srcpackage' to 'arch src', the pseudo architecture
-        // satsolver uses.
-        nid = ::rel2id( pool_r, nid, IdString(ARCH_SRC).id(), REL_ARCH, /*create*/true );
+        // libsolv uses.
+        nid = ::pool_rel2id( pool_r, nid, IdString(ARCH_SRC).id(), REL_ARCH, /*create*/true );
       }
 
       // Extend name by architecture, if provided and not a srcpackage
       if ( ! arch_r.empty() && kind_r != ResKind::srcpackage )
       {
-        nid = ::rel2id( pool_r, nid, arch_r.id(), REL_ARCH, /*create*/true );
+        nid = ::pool_rel2id( pool_r, nid, arch_r.id(), REL_ARCH, /*create*/true );
       }
 
       // Extend 'op edition', if provided
       if ( op_r != Rel::ANY && ed_r != Edition::noedition )
       {
-        nid = ::rel2id( pool_r, nid, ed_r.id(), op_r.bits(), /*create*/true );
+        nid = ::pool_rel2id( pool_r, nid, ed_r.id(), op_r.bits(), /*create*/true );
       }
 
       return nid;
@@ -300,7 +300,7 @@ namespace zypp
   {}
 
   const char * Capability::c_str() const
-  { return( _id ? ::dep2str( myPool().getPool(), _id ) : "" ); }
+  { return( _id ? ::pool_dep2str( myPool().getPool(), _id ) : "" ); }
 
   CapMatch Capability::_doMatch( sat::detail::IdType lhs,  sat::detail::IdType rhs )
   {
@@ -360,7 +360,7 @@ namespace zypp
     static       str::smatch what;
     static const str::regex  filenameRegex(
                  "/(s?bin|lib(64)?|etc)/|^/usr/(games/|share/(dict/words|magic\\.mime)$)|^/opt/gnome/games/",
-                 str::regex::optimize|str::regex::nosubs );
+                 str::regex::nosubs );
 
     return str::regex_match( name_r, what, filenameRegex );
   }
@@ -487,7 +487,7 @@ namespace zypp
       _kind = EXPRESSION;
       return;
     }
-    // map back satsolvers pseudo arch 'src' to kind srcpackage
+    // map back libsolvs pseudo arch 'src' to kind srcpackage
     if ( _archIfSimple == ARCH_SRC )
     {
       _lhs = IdString( (ResKind::srcpackage.asString() + ":" + IdString(_lhs).c_str()).c_str() ).id();

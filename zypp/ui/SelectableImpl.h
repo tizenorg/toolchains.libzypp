@@ -17,7 +17,8 @@
 
 #include "zypp/base/PtrTypes.h"
 
-#include "zypp/ZConfig.h"
+#include "zypp/ResPool.h"
+#include "zypp/Resolver.h"
 #include "zypp/ui/Selectable.h"
 #include "zypp/ui/SelectableTraits.h"
 
@@ -71,7 +72,6 @@ namespace zypp
           else
             _availableItems.insert( *it );
         }
-        _defaultCandidate = defaultCandidate();
       }
 
     public:
@@ -111,7 +111,7 @@ namespace zypp
         PoolItem ret( transactingCandidate() );
         if ( ret )
           return ret;
-        return _candidate ? _candidate : _defaultCandidate;
+        return _candidate ? _candidate : defaultCandidate();
       }
 
       /** Set a userCandidate (out of available objects).
@@ -143,31 +143,32 @@ namespace zypp
        */
       PoolItem updateCandidateObj() const
       {
-        if ( multiversionInstall() || installedEmpty() || ! _defaultCandidate )
-          return _defaultCandidate;
-        // Here: installed and _defaultCandidate are non NULL and it's not a
-        //       multiversion install.
+	PoolItem defaultCand( defaultCandidate() );
 
-        // update candidate must come from the highest priority repo
-        if ( _defaultCandidate->repoInfo().priority() != (*availableBegin())->repoInfo().priority() )
-          return PoolItem();
+	// multiversionInstall: This returns the candidate for the last
+	// instance installed. Actually we'd need a list here.
+
+        if ( installedEmpty() || ! defaultCand )
+          return defaultCand;
+        // Here: installed and defaultCand are non NULL and it's not a
+        //       multiversion install.
 
         PoolItem installed( installedObj() );
         // check vendor change
-        if ( ! ( ZConfig::instance().solver_allowVendorChange()
-                 || VendorAttr::instance().equivalent( _defaultCandidate->vendor(), installed->vendor() ) ) )
+        if ( ! ( ResPool::instance().resolver().allowVendorChange()
+                 || VendorAttr::instance().equivalent( defaultCand->vendor(), installed->vendor() ) ) )
           return PoolItem();
 
         // check arch change (arch noarch changes are allowed)
-        if ( _defaultCandidate->arch() != installed->arch()
-           && ! ( _defaultCandidate->arch() == Arch_noarch || installed->arch() == Arch_noarch ) )
+        if ( defaultCand->arch() != installed->arch()
+           && ! ( defaultCand->arch() == Arch_noarch || installed->arch() == Arch_noarch ) )
           return PoolItem();
 
         // check greater edition
-        if ( _defaultCandidate->edition() <= installed->edition() )
+        if ( defaultCand->edition() <= installed->edition() )
           return PoolItem();
 
-        return _defaultCandidate;
+        return defaultCand;
       }
 
       /** \copydoc Selectable::highestAvailableVersionObj()const */
@@ -184,30 +185,38 @@ namespace zypp
 
       /** \copydoc Selectable::identicalAvailable( const PoolItem & )const */
       bool identicalAvailable( const PoolItem & rhs ) const
+      { return bool(identicalAvailableObj( rhs )); }
+
+      /** \copydoc Selectable::identicalInstalled( const PoolItem & )const */
+      bool identicalInstalled( const PoolItem & rhs ) const
+      { return bool(identicalInstalledObj( rhs )); }
+
+      /** \copydoc Selectable::identicalAvailableObj( const PoolItem & rhs ) const */
+      PoolItem identicalAvailableObj( const PoolItem & rhs ) const
       {
         if ( !availableEmpty() && rhs )
         {
           for_( it, _availableItems.begin(), _availableItems.end() )
           {
             if ( identical( *it, rhs ) )
-              return true;
+              return *it;
           }
         }
-        return false;
+        return PoolItem();
       }
 
-      /** \copydoc Selectable::identicalInstalled( const PoolItem & )const */
-      bool identicalInstalled( const PoolItem & rhs ) const
+      /** \copydoc Selectable::identicalInstalledObj( const PoolItem & rhs ) const */
+      PoolItem identicalInstalledObj( const PoolItem & rhs ) const
       {
         if ( !installedEmpty() && rhs )
         {
           for_( it, _installedItems.begin(), _installedItems.end() )
           {
             if ( identical( *it, rhs ) )
-              return true;
+              return *it;
           }
         }
-        return false;
+        return PoolItem();
       }
 
       /** Best among all objects. */
@@ -283,7 +292,7 @@ namespace zypp
       { return availableEmpty(); }
 
       bool multiversionInstall() const
-      { return theObj().satSolvable().multiversionInstall(); }
+      { return sat::Pool::instance().isMultiversion( ident() ); }
 
       bool pickInstall( const PoolItem & pi_r, ResStatus::TransactByValue causer_r, bool yesno_r );
 
@@ -350,10 +359,10 @@ namespace zypp
 
       PoolItem defaultCandidate() const
       {
-        if ( ! ( multiversionInstall() || installedEmpty() ) )
+        if ( ! installedEmpty() )
         {
           // prefer the installed objects arch and vendor
-          bool solver_allowVendorChange( ZConfig::instance().solver_allowVendorChange() );
+          bool solver_allowVendorChange( ResPool::instance().resolver().allowVendorChange() );
           for ( installed_const_iterator iit = installedBegin();
                 iit != installedEnd(); ++iit )
           {
@@ -414,8 +423,6 @@ namespace zypp
       const std::string      _name;
       InstalledItemSet       _installedItems;
       AvailableItemSet       _availableItems;
-      //! Best among availabe with restpect to installed.
-      PoolItem               _defaultCandidate;
       //! The object selected by setCandidateObj() method.
       PoolItem               _candidate;
       //! lazy initialized picklist

@@ -27,8 +27,9 @@
 #include "zypp/target/rpm/RpmDb.h"
 #include "zypp/target/TargetException.h"
 #include "zypp/target/RequestedLocalesFile.h"
-#include "zypp/target/SoftLocksFile.h"
+#include "zypp/target/SolvIdentFile.h"
 #include "zypp/target/HardLocksFile.h"
+#include "zypp/ManagedFile.h"
 
 ///////////////////////////////////////////////////////////////////
 namespace zypp
@@ -101,13 +102,15 @@ namespace zypp
       Pathname _tmpSolvfilesPath;
 
     public:
-      void load();
+      void load( bool force = true );
 
       void unload();
 
+      void reload();
+
       void clearCache();
 
-      void buildCache();
+      bool buildCache();
       //@}
 
     public:
@@ -118,13 +121,19 @@ namespace zypp
 
       /** The directory to store things. */
       Pathname home() const
-      { return _root / "/var/lib/zypp"; }
+      { return home( _root ); }
+
+      static Pathname home( const Pathname & root_r )
+      { return root_r / "/var/lib/zypp"; }
 
       /** Commit changes in the pool */
       ZYppCommitResult commit( ResPool pool_r, const ZYppCommitPolicy & policy_r );
 
       /** Install a source package on the Target. */
       void installSrcPackage( const SrcPackage_constPtr & srcPackage_r );
+
+      /** Provides a source package on the Target. */
+      ManagedFile provideSrcPackage( const SrcPackage_constPtr & srcPackage_r );
 
       /** Overload to realize stream output. */
       virtual std::ostream & dumpOn( std::ostream & str ) const
@@ -150,6 +159,11 @@ namespace zypp
       /** \copydoc Target::baseProduct() */
       Product::constPtr baseProduct() const;
 
+      /** \copydoc Target::requestedLocales() */
+      LocaleSet requestedLocales() const
+      { return _requestedLocalesFile.locales(); }
+      /** \overload */
+      static LocaleSet requestedLocales( const Pathname & root_r );
 
       /** \copydoc Target::targetDistribution() */
       std::string targetDistribution() const;
@@ -187,6 +201,8 @@ namespace zypp
 		   CommitPackageCache & packageCache_r,
 		   ZYppCommitResult & result_r );
 
+      /** Commit helper checking for file conflicts after download. */
+      void commitFindFileConflicts( const ZYppCommitPolicy & policy_r, ZYppCommitResult & result_r );
     protected:
       /** Path to the target */
       Pathname _root;
@@ -194,8 +210,8 @@ namespace zypp
       rpm::RpmDb _rpm;
       /** Requested Locales database */
       RequestedLocalesFile _requestedLocalesFile;
-      /** Soft-locks database */
-      SoftLocksFile _softLocksFile;
+      /** user/auto installed database */
+      SolvIdentFile _autoInstalledFile;
       /** Hard-Locks database */
       HardLocksFile _hardLocksFile;
       /** Cache distributionVersion */

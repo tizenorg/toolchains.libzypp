@@ -4,6 +4,10 @@ SET( PACKAGE "libzypp" )
 SET( CMAKE_MODULE_PATH ${LIBZYPP_SOURCE_DIR}/cmake/modules )
 cmake_minimum_required(VERSION 2.6)
 
+
+OPTION (DISABLE_LIBPROXY "Build without libproxy support even if package is installed?" OFF)
+OPTION (DISABLE_AUTODOCS "Do not require doxygen being installed (required to build autodocs)?" OFF)
+
 # allow name libraries by name mixed with full
 # paths
 if(COMMAND cmake_policy)
@@ -25,8 +29,8 @@ include(CheckCXXCompilerFlag)
 CHECK_C_COMPILER_FLAG("-Werror=format-security" CC_FORMAT_SECURITY)
 CHECK_CXX_COMPILER_FLAG("-Werror=format-security" CXX_FORMAT_SECURITY)
 
-SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-strict-aliasing -fPIC -g -Wall -Woverloaded-virtual -Wnon-virtual-dtor -Wl,-as-needed" )
-SET( CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-strict-aliasing -fPIC -g -Wall -Wl,-as-needed" )
+SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility-inlines-hidden -fno-strict-aliasing -fPIC -g -rdynamic -Wall -Woverloaded-virtual -Wnon-virtual-dtor -Wl,-as-needed -std=c++11" )
+SET( CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -fno-strict-aliasing -fPIC -g -rdynamic -Wall -Wl,-as-needed" )
 
 set( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O3" )
 set( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -O3" )
@@ -64,6 +68,8 @@ MACRO(ADD_TESTS)
 ENDMACRO(ADD_TESTS)
 
 ####################################################################
+# prefer packages using the same install prefix as we do
+SET(CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX} usr/localX /usr/local /usr)
 
 FIND_PACKAGE(Rpm REQUIRED)
 IF ( NOT RPM_FOUND)
@@ -120,14 +126,15 @@ ELSE ( NOT ZLIB_FOUND)
   INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIR})
 ENDIF( NOT ZLIB_FOUND)
 
-FIND_PACKAGE(Satsolver REQUIRED)
-IF ( NOT SATSOLVER_FOUND )
-  MESSAGE( FATAL_ERROR " libsatsolver not found" )
-ELSE ( NOT SATSOLVER_FOUND )
-  INCLUDE_DIRECTORIES( ${SATSOLVER_INCLUDE_DIR} )
-ENDIF( NOT SATSOLVER_FOUND )
+#SET(LibSolv_USE_STATIC_LIBS ON)
+FIND_PACKAGE(LibSolv REQUIRED ext)
+IF ( NOT LibSolv_FOUND )
+  MESSAGE( FATAL_ERROR " libsolv not found" )
+ELSE()
+  INCLUDE_DIRECTORIES( ${LibSolv_INCLUDE_DIRS} )
+ENDIF()
 
-# satsolver uses expat and has open references to it:
+# libsolv uses expat and has open references to it:
 FIND_PACKAGE(EXPAT REQUIRED)
 
 FIND_PACKAGE(OpenSSL REQUIRED)
@@ -152,17 +159,25 @@ ELSE ( NOT UDEV_FOUND )
   ADD_DEFINITIONS(-DHAVE_UDEV)
 ENDIF ( NOT UDEV_FOUND )
 
-FIND_PACKAGE(libproxy)
-IF ( NOT LIBPROXY_FOUND )
-  MESSAGE( STATUS " libproxy not found" )
-ELSE ( NOT LIBPROXY_FOUND )
-  INCLUDE_DIRECTORIES( ${LIBPROXY_INCLUDE_DIR} )
-  ADD_DEFINITIONS(-D_WITH_LIBPROXY_SUPPORT_)
-ENDIF( NOT LIBPROXY_FOUND )
+IF( DISABLE_LIBPROXY )
+  MESSAGE( STATUS "libproxy support disabled" )
+ELSE( DISABLE_LIBPROXY )
+  FIND_PACKAGE(libproxy)
+  IF ( NOT LIBPROXY_FOUND )
+    MESSAGE( STATUS "libproxy not found" )
+  ELSE ( NOT LIBPROXY_FOUND )
+    INCLUDE_DIRECTORIES( ${LIBPROXY_INCLUDE_DIR} )
+    ADD_DEFINITIONS(-D_WITH_LIBPROXY_SUPPORT_)
+  ENDIF( NOT LIBPROXY_FOUND )
+ENDIF( DISABLE_LIBPROXY )
 
 FIND_PROGRAM( DOXYGEN doxygen )
 IF ( NOT DOXYGEN )
-  MESSAGE( FATAL_ERROR "doxygen not found: install doxygen to build the documentation." )
+  IF ( DISABLE_AUTODOCS )
+    MESSAGE( STATUS "doxygen is not available. Can't build the documentation." )
+  ELSE ( DISABLE_AUTODOCS )
+    MESSAGE( FATAL_ERROR "doxygen not found: install doxygen to build the documentation!" )
+  ENDIF ( DISABLE_AUTODOCS )
 ELSE ( NOT DOXYGEN )
   MESSAGE( STATUS "doxygen found: ${DOXYGEN}" )
 ENDIF ( NOT DOXYGEN )

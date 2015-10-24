@@ -38,9 +38,6 @@ namespace zypp
   { static std::string _type( "sha256" ); return _type; }
 
 
-  CheckSum::CheckSum()
-  {}
-
   CheckSum::CheckSum( const std::string & type, const std::string & checksum )
   : _type( str::toLower( type ) )
   , _checksum( checksum )
@@ -147,6 +144,19 @@ namespace zypp
       }
 
     return str << ( obj.type().empty() ? std::string("UNKNOWN") : obj.type() ) << '-' << obj.checksum();
+  }
+
+  std::ostream & dumpAsXmlOn( std::ostream & str, const CheckSum & obj )
+  {
+    const std::string & type( obj.type() );
+    const std::string & checksum( obj.checksum() );
+    str << "<checksum";
+    if ( ! type.empty() ) str << " type=\"" << type << "\"";
+    if ( checksum.empty() )
+      str << "/>";
+    else
+      str << ">" << checksum << "</checksum>";
+    return str;
   }
 
    /** \relates CheckSum */

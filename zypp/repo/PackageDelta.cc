@@ -12,7 +12,7 @@
 #include <iostream>
 extern "C"
 {
-#include <satsolver/knownid.h>
+#include <solv/knownid.h>
 }
 
 #include "zypp/base/LogTools.h"
@@ -83,7 +83,7 @@ namespace zypp
             break;
 
           case DELTA_DOWNLOADSIZE:
-            _location.setDownloadSize( ByteCount( it.asUnsigned(), ByteCount::K ) );
+            _location.setDownloadSize( ByteCount( it.asUnsignedLL() ) );
             break;
 
           case DELTA_CHECKSUM:

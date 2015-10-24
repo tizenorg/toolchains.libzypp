@@ -79,6 +79,9 @@ namespace zypp
   void Target::load()
   { _pimpl->load(); }
 
+  void Target::reload()
+  { _pimpl->reload(); }
+  
   void Target::unload()
   { _pimpl->unload(); }
 
@@ -102,6 +105,11 @@ namespace zypp
 
   Product::constPtr Target::baseProduct() const
   { return _pimpl->baseProduct(); }
+
+  LocaleSet Target::requestedLocales() const
+  { return _pimpl->requestedLocales(); }
+  LocaleSet Target::requestedLocales( const Pathname & root_r )
+  { return target::TargetImpl::requestedLocales( root_r ); }
 
   std::string Target::targetDistribution() const
   { return _pimpl->targetDistribution(); }

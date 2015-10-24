@@ -12,7 +12,9 @@
 #ifndef ZYPP_ZYPPCALLBACKS_H
 #define ZYPP_ZYPPCALLBACKS_H
 
+#include "zypp/base/EnumClass.h"
 #include "zypp/Callback.h"
+#include "zypp/UserData.h"
 #include "zypp/Resolvable.h"
 #include "zypp/RepoInfo.h"
 #include "zypp/Pathname.h"
@@ -25,6 +27,14 @@
 ///////////////////////////////////////////////////////////////////
 namespace zypp
 { /////////////////////////////////////////////////////////////////
+
+  ///////////////////////////////////////////////////////////////////
+  namespace sat
+  {
+    class Queue;
+    class FileConflicts;
+  } // namespace sat
+  ///////////////////////////////////////////////////////////////////
 
   struct ProgressReport : public callback::ReportBase
   {
@@ -101,6 +111,12 @@ namespace zypp
         IO,		// IO error
         INVALID		// the downloaded file is invalid
       };
+
+      /** Hint that package is available in the local cache (no download needed).
+       * This will be the only trigger for an already cached package.
+       */
+      virtual void infoInCache( Resolvable::constPtr res_r, const Pathname & localfile_r )
+      {}
 
       virtual void start(
         Resolvable::constPtr /*resolvable_ptr*/
@@ -442,6 +458,44 @@ namespace zypp
     };
 
     ///////////////////////////////////////////////////////////////////
+    /// \class FindFileConflictstReport
+    /// \brief Check for package file conflicts in commit (after download)
+    ///
+    /// File conflict check requires that all packages are downloaded and
+    /// now available in the cache (need to access the filelists). Missing
+    /// packages are omitted from check and their number is reported in
+    /// \a noFilelist_r. This usually happens if download mode 'as-needed'
+    /// is used.
+    ///////////////////////////////////////////////////////////////////
+    struct FindFileConflictstReport : public callback::ReportBase
+    {
+      /**
+       * \param progress_r	Progress counter for packages to check.
+       * \return \c true to continue, \c false upon user abort request.
+       */
+      virtual bool start( const ProgressData & progress_r )
+      { return true; }
+
+      /**
+       * \param progress_r	Progress counter for packages to check.
+       * \param noFilelist_r	Queue of so far skipped solvables (no filelist/not yet downloaded).
+       * \return \c true to continue, \c false upon user abort request.
+       */
+      virtual bool progress( const ProgressData & progress_r, const sat::Queue & noFilelist_r )
+      { return true; }
+
+      /**
+       * \param progress_r	Progress counter for packages to check.
+       * \param noFilelist_r	Queue of skipped solvables (no filelist/not yet downloaded).
+       * \param conflicts_r	File conflits queue.
+       * \return \c true to continue, \c false upon user abort request.
+       */
+      virtual bool result( const ProgressData & progress_r, const sat::Queue & noFilelist_r, const sat::FileConflicts & conflicts_r )
+      { return true; }
+    };
+
+
+    ///////////////////////////////////////////////////////////////////
     namespace rpm
     {
 
@@ -466,7 +520,7 @@ namespace zypp
         enum RpmLevel {
             RPM,
             RPM_NODEPS,
-            RPM_NODEPS_FORCE
+            RPM_NODEPS_FORCE	//!< only this one used
         };
 
         virtual void start(
@@ -710,6 +764,59 @@ namespace zypp
      virtual void finish(
        Error /*error*/
       ) {}
+  };
+
+  ///////////////////////////////////////////////////////////////////
+  /// \class JobReport
+  /// \brief Generic report for sending messages.
+  ///////////////////////////////////////////////////////////////////
+  struct JobReport : public callback::ReportBase
+  {
+  public:
+    /** message type (use like 'enum class \ref MsgType') */
+    struct _MsgTypeDef {
+      enum Enum { debug, info, warning, error, important, data };
+    };
+    typedef base::EnumClass<_MsgTypeDef> MsgType;	///< 'enum class MsgType'
+
+    /** typsafe map of userdata */
+    typedef callback::UserData UserData;
+
+  public:
+    /** Send a ready to show message text. */
+    virtual bool message( MsgType type_r, const std::string & msg_r, const UserData & userData_r ) const
+    { return true; }
+
+
+    /** \name Static sender instance */
+    //@{
+    /** Singleton sender instance */
+    static callback::SendReport<JobReport> & instance();	// impl in ZYppImpl.cc
+
+    /** send debug message text */
+    static bool debug( const MessageString & msg_r, const UserData & userData_r = UserData() )
+    { return instance()->message( MsgType::debug, msg_r, userData_r ); }
+
+    /** send message text */
+    static bool info( const MessageString & msg_r, const UserData & userData_r = UserData() )
+    { return instance()->message( MsgType::info, msg_r, userData_r ); }
+
+    /** send warning text */
+    static bool warning( const MessageString & msg_r, const UserData & userData_r = UserData() )
+    { return instance()->message( MsgType::warning, msg_r, userData_r ); }
+
+    /** send error text */
+    static bool error( const MessageString & msg_r, const UserData & userData_r = UserData() )
+    { return instance()->message( MsgType::error, msg_r, userData_r ); }
+
+    /** send important message text */
+    static bool important( const MessageString & msg_r, const UserData & userData_r = UserData() )
+    { return instance()->message( MsgType::important, msg_r, userData_r ); }
+
+    /** send data message */
+    static bool data( const MessageString & msg_r, const UserData & userData_r = UserData() )
+    { return instance()->message( MsgType::data, msg_r, userData_r ); }
+    //@}
   };
 
 

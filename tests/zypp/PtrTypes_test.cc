@@ -29,14 +29,14 @@ template<class _Trace>
 /** Data class for shared_ptr */
 struct NonIntrusive : private Trace<NonIntrusive>
 {
-  Trace<NonIntrusive>::numericId;
+  using Trace<NonIntrusive>::numericId;
 };
 
 /** Data class for intrusive_ptr */
 struct Intrusive : public ReferenceCounted,
                    private Trace<Intrusive>
 {
-  Trace<Intrusive>::numericId;
+  using Trace<Intrusive>::numericId;
 };
 
 namespace zypp
@@ -50,15 +50,17 @@ namespace zypp
     { return new Intrusive( *rhs ); }
 
 }
+
 /******************************************************************
 **
 */
-#define T_NULL       assert( !ptr )
-#define T_NOT_NULL   assert( ptr )
+#define T_NULL       assert( !ptr ); assert( ptr == nullptr )
+#define T_NOT_NULL   assert( ptr ); assert( ptr != nullptr )
 #define T_UNIQUE     assert( ptr.unique() ); assert( ptr.use_count() < 2 )
 #define T_NOT_UNIQUE assert( !ptr.unique() ); assert( ptr.use_count() >= 2 )
-#define T_EQ(a,b)   assert( a == b )
-#define T_NE(a,b)   assert( a != b )
+// Also comapre with underlying shared ptr type.
+#define T_EQ(a,b)   assert( a == b ); assert( a == b.cgetPtr() ); assert( a.cgetPtr() == b ); assert( a.cgetPtr() == b.cgetPtr() );
+#define T_NE(a,b)   assert( a != b ); assert( a != b.cgetPtr() ); assert( a.cgetPtr() != b ); assert( a.cgetPtr() != b.cgetPtr() );
 
 template<class _RW>
   void test()
@@ -98,6 +100,18 @@ template<class _RW>
     ptr.reset( 0 );
     T_NULL;
     T_UNIQUE;
+    // nullptr compatible
+    ptr.reset( nullptr );
+    T_NULL;
+    T_UNIQUE;
+    ptr = nullptr;
+    T_NULL;
+    T_UNIQUE;
+    ptr = _RW( nullptr );
+    T_NULL;
+    T_UNIQUE;
+
+
   }
 
 template<class _RW>

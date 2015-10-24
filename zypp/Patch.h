@@ -59,11 +59,27 @@ namespace zypp
        */
       enum InteractiveFlag {
         NoFlags = 0x0000,
-        Reboot = 0x0001,
+        Reboot  = 0x0001,
         Message = 0x0002,
         License = 0x0004
       };
       ZYPP_DECLARE_FLAGS(InteractiveFlags, InteractiveFlag);
+
+      /**
+       * \brief Possible severity levels for (security) patches.
+       * Metadata string values are mapped to this enum to ease
+       * computations. For a string representation call
+       * \ref asSring( const Patch::SeverityFlag & ).
+       */
+      enum SeverityFlag {
+	SEV_NONE	= 0,	//!< no value specified
+	SEV_OTHER	= 1,	//!< unknown value specified
+	SEV_LOW		= 1<<1,	//!< Low
+	SEV_MODERATE	= 1<<2,	//!< Moderate
+	SEV_IMPORTANT	= 1<<3,	//!< Important
+	SEV_CRITICAL	= 1<<4	//!< Critical
+      };
+      ZYPP_DECLARE_FLAGS(SeverityFlags, SeverityFlag);
 
     public:
       /**
@@ -73,15 +89,49 @@ namespace zypp
       Date timestamp() const
       { return buildtime(); }
 
+      /** \name Patch Category */
+      //@{
       /**
        * Patch category (recommended, security,...)
        */
       std::string category() const;
 
-      /** Patch category as enum of wellknown categories.
+      /** This patch's category as enum of wellknown categories.
        * Unknown values are mapped to \ref CAT_OTHER.
        */
       Category categoryEnum() const;
+
+      /** Whether this patch's category matches \a category_r */
+      bool isCategory( const std::string & category_r ) const;
+
+      /** Patch category as enum of wellknown categories.
+       * Unknown values are mapped to \ref CAT_OTHER.
+       */
+      static Category categoryEnum( const std::string & category_r );
+      //@}
+
+      /** \name Patch Severity */
+      //@{
+      /**
+       * Severity string as specified in metadata.
+       * For use in computaions see \ref severityFlag.
+       */
+      std::string severity() const;
+
+      /**
+       * Severity string mapped to an enum.
+       * Unknown string values are mapped to \ref SEV_OTHER
+       */
+      SeverityFlag severityFlag() const;
+
+      /** Whether this patch's severity matches \a severity_r */
+      bool isSeverity( const std::string & severity_r ) const;
+
+      /** Severity string mapped to an enum.
+       * Unknown string values are mapped to \ref SEV_OTHER
+       */
+      static SeverityFlag severityFlag( const std::string & category_r );
+      //@}
 
       /**
        * Does the system need to reboot to finish the update process?
@@ -156,7 +206,10 @@ namespace zypp
       virtual ~Patch();
   };
   ZYPP_DECLARE_OPERATORS_FOR_FLAGS(Patch::InteractiveFlags);
+  ZYPP_DECLARE_OPERATORS_FOR_FLAGS(Patch::SeverityFlags);
 
+  /** \relates Patch::SeverityFlag string representation.*/
+  std::string asString( const Patch::SeverityFlag & obj );
 
   /**
    * Query class for Patch issue references

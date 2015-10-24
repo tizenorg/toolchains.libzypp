@@ -12,60 +12,85 @@
 #ifndef ZYPP_BASE_REGEX_H
 #define ZYPP_BASE_REGEX_H
 
+#include <iosfwd>
 #include <string>
 #include <regex.h>
 
 #include "zypp/base/Exception.h"
 
-///////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 namespace zypp
-{ /////////////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////////////
-  /** String related utilities and \ref ZYPP_STR_REGEX.
-   \see \ref ZYPP_STR_REGEX
-  */
+{
+  //////////////////////////////////////////////////////////////////
+  /// \namespace str
+  /// \brief String related utilities and \ref ZYPP_STR_REGEX.
   namespace str
-  { /////////////////////////////////////////////////////////////////
-
-    ///////////////////////////////////////////////////////////////////
-    /** \defgroup ZYPP_STR_REGEX Regular expressions
-     *
-     * Namespace zypp::str regular expressions \b using the glibc regex library.
-     *
-     * \see \ref sat::AttrMatcher string matcher supporing regex, globing, etc.
-     *
-     * regex
-     * regex_match
-     * smatch
-     */
+  {
+    //////////////////////////////////////////////////////////////////
+    /// \defgroup ZYPP_STR_REGEX Regular expression matching
+    /// \brief Regular expressions using the glibc regex library.
+    ///
+    /// \see also \ref StrMatcher string matcher also supporting globing, etc.
+    ///
+    /// \code
+    ///  str::regex rxexpr( "^(A)?([0-9]*) im" );
+    ///  str::smatch what;
+    ///
+    ///  std::string mytext( "Y123 imXXXX" );
+    ///  if ( str::regex_match( mytext, what, rxexpr ) )
+    ///  {
+    ///    MIL << "MATCH '" << what[0] << "'" << endl;
+    ///    MIL << " subs: " << what.size()-1 << endl;
+    ///    for_( i, 1U, what.size() )
+    ///      MIL << "      [" << i << "] " << what[i] << endl;
+    ///  }
+    ///  else
+    ///  {
+    ///    WAR << "NO MATCH '" << rxexpr << "' in '" <<  mytext << endl;
+    ///  }
+    /// \endcode
+    //////////////////////////////////////////////////////////////////
 
     typedef Exception regex_error;
 
     class smatch;
     class regex;
 
-    bool regex_match(const char * s, str::smatch& matches, const regex& regex);
-    inline bool regex_match(const std::string& s, str::smatch& matches, const regex& regex)
+    //////////////////////////////////////////////////////////////////
+    /// \brief Regular expression matching
+    ///
+    /// \ingroup ZYPP_STR_REGEX
+    /// \relates regex
+    /// Return whether a \ref regex matches a specific string. An optionally
+    /// passed \ref smatch object will contain the match reults.
+    //////////////////////////////////////////////////////////////////
+    bool regex_match( const char * s, smatch & matches, const regex & regex );
+
+    /** \copydoc regex_match \relates regex \ingroup ZYPP_STR_REGEX */
+    inline bool regex_match(const std::string & s, smatch & matches, const regex & regex)
     { return regex_match( s.c_str(), matches, regex ); }
 
-    bool regex_match(const char * s, const regex& regex);
-    inline bool regex_match(const std::string& s, const regex& regex)
+    /** \copydoc regex_match \relates regex \ingroup ZYPP_STR_REGEX */
+    bool regex_match( const char * s, const regex & regex );
+
+    /** \copydoc regex_match \relates regex \ingroup ZYPP_STR_REGEX */
+    inline bool regex_match( const std::string & s, const regex & regex )
     { return regex_match( s.c_str(), regex ); }
 
-    /**
-     * \see \ref sat::AttrMatcher string matcher supporing regex, globing, etc.
-     * \ingroup ZYPP_STR_REGEX
-     */
-    class regex {
+    //////////////////////////////////////////////////////////////////
+    /// \class regex
+    /// \brief Regular expression
+    ///
+    /// \ingroup ZYPP_STR_REGEX
+    //////////////////////////////////////////////////////////////////
+    class regex
+    {
     public:
 
       enum RegFlags {
-        optimize = 0,
-        match_extra = 0,
-        icase = REG_ICASE,
-        nosubs = REG_NOSUB,
-        match_extended = REG_EXTENDED,
-        normal = 1<<16
+        icase		= REG_ICASE,	///< Do not differentiate case
+        nosubs		= REG_NOSUB,	///< Support for substring addressing of matches is not required
+        match_extended	= REG_EXTENDED, ///< Use POSIX Extended Regular Expression syntax when interpreting regex.
       };
 
       regex();
@@ -102,11 +127,23 @@ namespace zypp
       bool m_valid;
     };
 
-    /**
-     * \ingroup ZYPP_STR_REGEX
-     * \see regex
-     */
-    class smatch {
+    /** \relates regex Stream output */
+    inline std::ostream & operator<<( std::ostream & str, const regex & obj )
+    { return str << obj.asString(); }
+
+    //////////////////////////////////////////////////////////////////
+    /// \class smatch
+    /// \brief Regular expression match result
+    ///
+    /// \ingroup ZYPP_STR_REGEX
+    ///
+    /// Index \c n=0 returns the string object representing the character
+    /// sequence that matched the whole regular expression.
+    /// If \c n is out of range, or if \c n is an unmatched sub-expression,
+    /// then an empty string is returned.
+    //////////////////////////////////////////////////////////////////
+    class smatch
+    {
     public:
       smatch();
 
@@ -118,12 +155,8 @@ namespace zypp
       regmatch_t pmatch[12];
     };
 
-
-
-    /////////////////////////////////////////////////////////////////
   } // namespace str
-  ///////////////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////
 } // namespace zypp
-///////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 #endif // ZYPP_BASE_STRING_H

@@ -25,6 +25,8 @@
 #include "zypp/media/Mount.h"
 #include "zypp/media/MediaException.h"
 
+#include "zypp/PathInfo.h"
+
 #ifndef N_
 #define N_(STR) STR
 #endif
@@ -278,8 +280,15 @@ Mount::getEntries(const std::string &mtab)
 
   if( mtab.empty())
   {
-    mtabs.push_back("/etc/mtab");
     mtabs.push_back("/proc/mounts");
+    // Also read /etc/mtab if it is a file (on newer sytems
+    // mtab is a symlink to /proc/mounts).
+    // Reason for this is the different representation of
+    // mounted loop devices:
+    //   /etc/mtab:    /tmp/SLES-11-SP2-MINI-ISO-x86_64-Beta2-DVD.iso on /mnt type iso9660 (ro,loop=/dev/loop0)
+    //   /proc/mounts: /dev/loop0 /mnt iso9660 ro,relatime 0 0
+    if ( PathInfo( "/etc/mtab", PathInfo::LSTAT ).isFile() )
+      mtabs.push_back("/etc/mtab");
   }
   else
   {
@@ -293,7 +302,7 @@ Mount::getEntries(const std::string &mtab)
     {
       DBG << "Reading mount table from '" << *t << "'" << std::endl;
     }
-    FILE *fp = setmntent(t->c_str(), "r");
+    FILE *fp = setmntent(t->c_str(), "re");
     if( fp)
     {
       char          buf[PATH_MAX * 4];
@@ -315,6 +324,16 @@ Mount::getEntries(const std::string &mtab)
             ent.mnt_freq,   ent.mnt_passno
           );
 
+	  // Attempt quick fix for bnc#710269:
+	  // MountEntry is "//dist/install/ on /var/adm/mount/AP_0x00000001 type cifs (ro,relatime,unc=\dist\install,username=,domain=suse.de"
+	  // but looking for "Looking for media(cifs<//dist/install>)attached(*/var/adm/mount/AP_0x00000001)"
+	  // Kick the trailing '/' in "//dist/install/"
+	  // TODO: Check and fix comparison in MediaHandler::checkAttached instead.
+	  if ( entry.src.size() > 1	// not for "/"
+	       && entry.src[entry.src.size()-1] == '/' )
+	  {
+	    entry.src.erase( entry.src.size()-1 );
+	  }
           entries.push_back(entry);
 
           memset(buf,  0, sizeof(buf));

@@ -33,6 +33,7 @@ void regex::assign(const std::string& str,int flags)
   m_flags = flags;
   int err;
   char errbuff[100];
+  static const int normal = 1<<16; // deprecated legacy, use match_extended
   if (!(flags & normal)) {
     flags |= match_extended;
     flags &= ~(normal);
@@ -76,20 +77,23 @@ smatch::smatch()
 
 std::string smatch::operator[](unsigned i) const
 {
-  if (i < sizeof(pmatch)/sizeof(*pmatch) && pmatch[i].rm_so != -1)
-    return match_str.substr(pmatch[i].rm_so, pmatch[i].rm_eo-pmatch[i].rm_so);
+  if ( i < sizeof(pmatch)/sizeof(*pmatch) && pmatch[i].rm_so != -1 )
+    return match_str.substr( pmatch[i].rm_so, pmatch[i].rm_eo-pmatch[i].rm_so );
+
   return std::string();
 }
 
 
 unsigned smatch::size() const
 {
-  unsigned matches = 0;
-  while (matches <  ((sizeof(pmatch)/sizeof(*pmatch))-1) && pmatch[matches+1].rm_so != -1) {
-    //    std::cout << "match[" << matches << "]: *" << (*this)[matches
-    //        +1] << "*" << std::endl;
-    matches++;
+  unsigned matches = unsigned(-1);
+  // Get highest (pmatch[i].rm_so != -1). Just looking for the 1st
+  // (pmatch[i].rm_so == -1) is wrong as optional mayches "()?"
+  // may be embeded.
+  for ( unsigned i = 0; i < sizeof(pmatch)/sizeof(*pmatch); ++i )
+  {
+    if ( pmatch[i].rm_so != -1 )
+      matches = i;
   }
-
-  return matches;
+  return ++matches;
 }

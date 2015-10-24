@@ -20,7 +20,7 @@
 #include "zypp/base/ReferenceCounted.h"
 #include "zypp/base/NonCopyable.h"
 #include "zypp/base/PtrTypes.h"
-#include "zypp/base/Deprecated.h"
+#include "zypp/APIConfig.h"
 
 #include "zypp/Pathname.h"
 #include "zypp/PathInfo.h"
@@ -104,16 +104,6 @@ namespace zypp {
 	 * @return True, if the files are downloaded.
 	 */
 	bool        downloads() const;
-
-	/** \deprecated Use \ref Url::schemeIsDownloading */
-	static
-	ZYPP_DEPRECATED bool downloads(const Url &url)
-        { return url.schemeIsDownloading(); }
-
-	/** \deprecated Use \ref Url::schemeIsVolatile */
-	static
-	ZYPP_DEPRECATED bool canBeVolatile(const Url &url)
-        { return url.schemeIsVolatile(); }
 
 	/**
 	 * Used Protocol if media is opened, otherwise 'unknown'.

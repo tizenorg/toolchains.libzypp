@@ -22,7 +22,7 @@
 
 #include "zypp/sat/SolvIterMixin.h"
 #include "zypp/sat/LookupAttr.h"
-#include "zypp/sat/AttrMatcher.h"
+#include "zypp/base/StrMatcher.h"
 #include "zypp/sat/Pool.h"
 
 ///////////////////////////////////////////////////////////////////
@@ -462,7 +462,7 @@ namespace zypp
     // low level API
 
     /**
-     * Free function to get the satsolver repo search
+     * Free function to get libsolv repo search
      * flags.
      *
      * \see \ref Match
@@ -470,7 +470,7 @@ namespace zypp
     Match flags() const;
 
     /**
-     * Free function to set the satsolver repo search
+     * Free function to set libsolv repo search
      * flags.
      *
      * \see \ref Match

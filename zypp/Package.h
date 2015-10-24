@@ -47,7 +47,11 @@ namespace zypp
      * Returns the level of supportability the vendor
      * gives to this package.
      *
-     * This is one value from \ref VendorSupportOption
+     * If the identical package happens to appear in multiple
+     * repos with different support levels, the maximum
+     * level is returned.
+     *
+     * This is one value from \ref VendorSupportOption.
      */
     VendorSupportOption vendorSupport() const;
 
@@ -117,6 +121,13 @@ namespace zypp
      * retrieve the packge (url, checksum, etc.).
      */
     OnMediaLocation location() const;
+
+    /** Location of the downloaded package in cache or an empty path. */
+    Pathname cachedLocation() const;
+
+    /** Whether the package is cached. */
+    bool isCached() const
+    { return ! cachedLocation().empty(); }
 
   protected:
     friend Ptr make<Self>( const sat::Solvable & solvable_r );

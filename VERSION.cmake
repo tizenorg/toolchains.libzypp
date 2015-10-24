@@ -45,24 +45,24 @@
 # ==================================================
 
 #=======
-# - Update version according to your changes,
-#   but based on 'LAST RELEASED:' below. I.e
-#   there's no need to increase LIBZYPP_MINOR
-#   if it already differs from 'LAST RELEASED:'.
-#
 # - MOST IMPORTANT:
-#   Before you submitt to autobuild, rmember the
-#   new version in 'LAST RELEASED:', and add a
-#   note in the changes file.
+#   - Before you submitt to git:
+#     - Remember the new version in 'LAST RELEASED:'
+#     - State the new version in the changes file by adding a line
+#       "- version MAJOR.MINOR.PATCH (COMPATMINOR)"
+#     - Commit changes and version files together in a separate
+#       commit using -m 'changes MAJOR.MINOR.PATCH (COMPATMINOR)'
+#     - Tag the above commit with 'MAJOR.MINOR.PATCH' using
+#       -m "tagging MAJOR.MINOR.PATCH".
 #
-# - Consider calling ./mkChangelog to edit the
-#   changes file. See './mkChangelog -h' for help.
+# - Consider calling ./mkChangelog to assist you.
+#   See './mkChangelog -h' for help.
 #
-SET(LIBZYPP_MAJOR "9")
-SET(LIBZYPP_COMPATMINOR "8")
-SET(LIBZYPP_MINOR "8")
-SET(LIBZYPP_PATCH "3")
+SET(LIBZYPP_MAJOR "14")
+SET(LIBZYPP_COMPATMINOR "27")
+SET(LIBZYPP_MINOR "27")
+SET(LIBZYPP_PATCH "0")
 #
-# LAST RELEASED: 9.8.3 (8)
+# LAST RELEASED: 14.27.0 (27)
 # (The number in parenthesis is LIBZYPP_COMPATMINOR)
 #=======

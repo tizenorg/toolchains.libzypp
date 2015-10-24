@@ -256,9 +256,10 @@ IMPL_PTR_TYPE(MediaSetAccess);
             reason = media::MediaChangeReport::IO_SOFT;
           }
 
-          // non interactive only bother the user if wrong medium is in the drive
-          // otherwise propagate the error
-          if ( ( options & PROVIDE_NON_INTERACTIVE ) && reason != media::MediaChangeReport::WRONG)
+          // Propagate the original error if _no_ callback receiver is connected, or
+	  // non_interactive mode (for optional files) is used (except for wrong media).
+          if ( ! callback::SendReport<media::MediaChangeReport>::connected()
+	     || (( options & PROVIDE_NON_INTERACTIVE ) && reason != media::MediaChangeReport::WRONG ) )
           {
               MIL << "Can't provide file. Non-Interactive mode." << endl;
               ZYPP_RETHROW(excp);
@@ -284,7 +285,9 @@ IMPL_PTR_TYPE(MediaSetAccess);
           if( user == media::MediaChangeReport::ABORT )
           {
             DBG << "Aborting" << endl;
-            ZYPP_RETHROW ( excp );
+            AbortRequestException aexcp("Aborting requested by user");
+            aexcp.remember(excp);
+            ZYPP_THROW(aexcp);
           }
           else if ( user == media::MediaChangeReport::IGNORE )
           {
@@ -296,10 +299,15 @@ IMPL_PTR_TYPE(MediaSetAccess);
           else if ( user == media::MediaChangeReport::EJECT )
           {
             DBG << "Eject: try to release" << endl;
-            media_mgr.releaseAll();
-            // eject
-            media_mgr.release (media,
-              devindex < devices.size() ? devices[devindex] : "");
+	    try
+	    {
+	      media_mgr.releaseAll();
+	      media_mgr.release (media, devindex < devices.size() ? devices[devindex] : "");
+	    }
+	    catch ( const Exception & e)
+	    {
+	      ZYPP_CAUGHT(e);
+	    }
           }
           else if ( user == media::MediaChangeReport::RETRY  ||
             user == media::MediaChangeReport::CHANGE_URL )

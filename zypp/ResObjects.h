@@ -17,5 +17,6 @@
 #include "zypp/Pattern.h"
 #include "zypp/Product.h"
 #include "zypp/SrcPackage.h"
+#include "zypp/Application.h"
 
 #endif // ZYPP_RESOBJECTS_H

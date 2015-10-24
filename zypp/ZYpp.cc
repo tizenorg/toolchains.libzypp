@@ -15,6 +15,7 @@
 #include "zypp/ZYpp.h"
 #include "zypp/zypp_detail/ZYppImpl.h"
 #include "zypp/sat/Pool.h"
+#include "zypp/ManagedFile.h"
 
 using std::endl;
 
@@ -100,17 +101,9 @@ namespace zypp
   void ZYpp::installSrcPackage( const SrcPackage_constPtr & srcPackage_r )
   { _pimpl->installSrcPackage( srcPackage_r ); }
 
+  ManagedFile ZYpp::provideSrcPackage( const SrcPackage_constPtr & srcPackage_r )
+  {return _pimpl->provideSrcPackage( srcPackage_r ); }
   ///////////////////////////////////////////////////////////////////
-
-  void ZYpp::setRequestedLocales( const LocaleSet & locales_r )
-  { sat::Pool::instance().setRequestedLocales( locales_r ); }
-
-  const LocaleSet & ZYpp::getRequestedLocales() const
-  { return sat::Pool::instance().getRequestedLocales(); }
-
-  const LocaleSet & ZYpp::getAvailableLocales() const
-  { return sat::Pool::instance().getAvailableLocales(); }
-
 
   Pathname ZYpp::homePath() const
   { return _pimpl->homePath(); }

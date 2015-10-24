@@ -19,6 +19,7 @@
 #include "zypp/sat/detail/PoolMember.h"
 #include "zypp/Repository.h"
 #include "zypp/sat/WhatProvides.h"
+#include "zypp/sat/Queue.h"
 
 ///////////////////////////////////////////////////////////////////
 namespace zypp
@@ -64,6 +65,9 @@ namespace zypp
 
         /** Update housekeeping data if necessary (e.g. whatprovides). */
         void prepare() const;
+
+	/** \ref prepare plus some expensive checks done before solving only. */
+	void prepareForSolving() const;
 
       public:
         /** Whether \ref Pool contains repos. */
@@ -193,7 +197,7 @@ namespace zypp
         */
         const LocaleSet & getRequestedLocales() const;
 
-        /** Wheter this \ref Locale is in the set of requested locales. */
+        /** Whether this \ref Locale is in the set of requested locales. */
         bool isRequestedLocale( const Locale & locale_r ) const;
 
         /** Get the set of available locales.
@@ -202,7 +206,7 @@ namespace zypp
          */
         const LocaleSet & getAvailableLocales() const;
 
-        /** Wheter this \ref Locale is in the set of available locales. */
+        /** Whether this \ref Locale is in the set of available locales. */
         bool isAvailableLocale( const Locale & locale_r ) const;
         //@}
 
@@ -223,18 +227,12 @@ namespace zypp
         //@}
 
       public:
-        /** \name Installed on behalf of a user request hint.
-	 * This is a hint guessed by evaluating an available install history.
-         */
+        /** \name Autoinstalled */
         //@{
-        typedef IdStringSet::const_iterator OnSystemByUserIterator;
-
-        bool onSystemByUserEmpty() const;
-        size_t onSystemByUserSize() const;
-        OnSystemByUserIterator onSystemByUserBegin() const;
-        OnSystemByUserIterator onSystemByUserEnd() const;
-
-        bool isOnSystemByUser( IdString ident_r ) const;
+        /** Get ident list of all autoinstalled solvables. */
+	Queue autoInstalled() const;
+	/** Set ident list of all autoinstalled solvables. */
+	void setAutoInstalled( const Queue & autoInstalled_r );
         //@}
 
       public:

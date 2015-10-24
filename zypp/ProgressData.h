@@ -35,7 +35,7 @@ namespace zypp
    * needs. As a convention, a zero sizes range indicates that you are just
    * able to send <em>'still alive'</em> triggers.
    *
-   * The counter should be updated in reasonable intervals. Don't mind wheter
+   * The counter should be updated in reasonable intervals. Don't mind whether
    * the counter value actually increased or not. ProgressData will recognize
    * your triggers and knows when to actually send notification to a consumer.
    *
@@ -126,11 +126,6 @@ namespace zypp
    *
    * The different ammount of triggers is due to different rules for sending
    * percent or 'still alive' messages.
-   *
-   * \todo Complete the progess sending.
-   * \todo Tell recipient whether percentage or keepalive is sent,
-   * the id and name might be helpfull, and maybe tell whether task
-   * is abortable or not; i.e extend the ReceiverFnc signature.
    */
   class ProgressData : public base::ProvideNumericId<ProgressData,unsigned>
   {
@@ -254,6 +249,14 @@ namespace zypp
 	return report();
       }
 
+      /** Set range and counter from an other \ref ProgressData. */
+      bool set( const ProgressData & rhs )
+      {
+	min( rhs.min() );
+	max( rhs.max() );
+	return set( rhs.val() );
+      }
+
       /** Increment counter \c value (default by 1). */
       bool incr( value_type val_r = 1 )
       { return set( val() + val_r ); }
@@ -268,11 +271,11 @@ namespace zypp
 
       /** Set counter value to current \c max value (unless no range). */
       bool toMax()
-      { return set( hasRange() ? max() : val() ); }
+      { return hasRange() ? set( max() ) : tick(); }
 
       /** Leave counter value unchanged (still alive). */
       bool tick()
-      { return set( val() ); }
+      { return report(); }
 
       //@}
 
@@ -292,18 +295,18 @@ namespace zypp
       value_type val() const
       { return _d->_val; }
 
-      /** @return Wheter <tt>[min,max]</tt> defines a nonempty range. */
+      /** @return Whether <tt>[min,max]</tt> defines a nonempty range. */
       bool hasRange() const
       { return min() != max(); }
 
-      /** @return Wheter \ref reportValue will return a percent value.
+      /** @return Whether \ref reportValue will return a percent value.
        * Same as \ref hasRange.
        *  \see \ref reportAlive
        */
       bool reportPercent() const
       { return hasRange(); }
 
-      /** @return Wheter \ref reportValue always returns -1, because we
+      /** @return Whether \ref reportValue always returns -1, because we
        * trigger 'still alive' messages. I.e. \ref hasrange is \c false.
        * \see \ref reportPercent
       */
@@ -324,9 +327,9 @@ namespace zypp
       const ReceiverFnc & receiver() const
       { return _d->_receiver; }
 
-      /** @return Retrun \c true if this the final report sent by the
+      /** @return Return \c true if this is the final report sent by the
        *  ProgressData dtor.
-      */
+       */
       bool finalReport() const
       { return( _d->_state == END ); }
 

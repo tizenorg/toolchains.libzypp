@@ -24,8 +24,8 @@
 
 extern "C"
 {
-#include <satsolver/solver.h>
-#include <satsolver/pool.h>
+#include <solv/solver.h>
+#include <solv/pool.h>
 }
 
 #include <iosfwd>
@@ -159,9 +159,6 @@ class SATResolver : public base::ReferenceCounted, private base::NonCopyable {
     ResolverProblemList problems ();
     void applySolutions (const ProblemSolutionList &solutions);
 
-    // Return the Transaction computed by the last solver run.
-    sat::Transaction getTransaction();
-
     void addPoolItemToInstall (PoolItem item);
     void addPoolItemsToInstallFromList (PoolItemList & rl);
 
@@ -219,6 +216,8 @@ class SATResolver : public base::ReferenceCounted, private base::NonCopyable {
     PoolItemList resultItemsToRemove () { return _result_items_to_remove; }
     PoolItemList problematicUpdateItems() { return _problem_items; }
 
+    sat::StringQueue autoInstalled() const;
+    sat::StringQueue userInstalled() const;
 };
 
 ///////////////////////////////////////////////////////////////////

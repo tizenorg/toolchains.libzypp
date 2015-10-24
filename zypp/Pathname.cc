@@ -25,161 +25,99 @@ namespace zypp
   { /////////////////////////////////////////////////////////////////
 
     ///////////////////////////////////////////////////////////////////
-    namespace
-    { /////////////////////////////////////////////////////////////////
-
-      ///////////////////////////////////////////////////////////////////
-      //
-      //	CLASS NAME : DirStack
-      //
-      /** silly helper to build Pathnames.
-      */
-      class DirStack {
-
-        struct Dir {
-
-          Dir *  up;
-          Dir *  dn;
-          string name;
-
-          Dir( const string & n = "" ) {
-            name = n;
-            up = dn = 0;
-          }
-
-          ~Dir() {
-            if ( up )
-              up->dn = dn;
-            if ( dn )
-              dn->up = up;
-          }
-        };
-
-        Dir *  top;
-        Dir *  bot;
-
-        void Pop() {
-          if ( !top )
-            return;
-          top = top->dn;
-          if ( top )
-            delete top->up;
-          else {
-            delete bot;
-            bot = 0;
-          }
-        }
-
-      public:
-
-        DirStack() { top = bot = 0; }
-        ~DirStack() {
-          while ( bot )
-            Pop();
-        }
-
-        void Push( const string & n ) {
-          if ( n.empty() || n == "." ) { // '.' or '/' only for bot
-            if ( bot )
-              return;
-          } else if ( n == ".." && top ) {
-            if ( top->name == "" )          // "/.."        ==> "/"
-              return;
-
-            if ( top->name != "." && top->name != ".." ) {      // "somedir/.." ==> ""
-              Pop();
-              return;
-            }
-            // "../.." "./.." stays
-          }
-
-          Dir * d = new Dir( n );
-          if ( !top )
-            top = bot = d;
-          else {
-            top->up = d;
-            d->dn = top;
-            d->up = 0;
-            top = d;
-          }
-        }
-
-        string str() {
-          if ( !bot )
-            return "";
-          string ret;
-          for ( Dir * d = bot; d; d = d->up ) {
-            if ( d != bot )
-              ret += "/";
-            ret += d->name;
-          }
-          if ( ret.empty() )
-            return "/";
-          return ret;
-        }
-      };
-
-      /////////////////////////////////////////////////////////////////
-    } // namespace
-    ///////////////////////////////////////////////////////////////////
-
-    ///////////////////////////////////////////////////////////////////
     //
     //	METHOD NAME : Pathname::_assign
     //	METHOD TYPE : void
     //
-    void Pathname::_assign( const string & name_tv )
+    void Pathname::_assign( const string & name_r )
     {
-      prfx_i = 0;
-      name_t = name_tv;
-
-      if ( name_t.empty() )
+      _name.clear();
+      if ( name_r.empty() )
         return;
+      _name.reserve( name_r.size() );
 
-      string   Tprfx;
-      DirStack Stack_Ci;
+      // Collect up to "/.."
+      enum Pending {
+	P_none	= 0,	// ""
+	P_slash	= 1,	// "/"
+	P_dot1	= 2,	// "/."
+	P_dot2	= 3	// "/.."
+      } pending = P_none;
 
-      char *       Buf_aci    = new char[name_tv.length() + 1];
-      char *       W_pci      = Buf_aci;
-      const char * R_pci      = name_tv.c_str();
-
-      // check for prefix
-      if (    name_t.length() >= 2
-           && name_t[1] == ':'
-           && (    ( 'a' <= name_t[0] && name_t[0] <= 'z' )
-                || ( 'A' <= name_t[0] && name_t[0] <= 'Z' ) ) ) {
-        Tprfx  = name_t.substr( 0, 2 );
-        prfx_i = 2;
-        R_pci += 2;
+      // Assert relative path starting with "./"
+      // We rely on this below!
+      if ( name_r[0] != '/' )
+      {
+	_name += '.';
+	pending = P_slash;
       }
 
-      // rel or abs path
-      if ( *R_pci == '/' ) {
-        Stack_Ci.Push( "" );
-        ++R_pci;
-      } else {
-        Stack_Ci.Push( "." );
+      // Lambda handling the "/.." case:
+      // []      + "/.."  ==> []
+      // [.]     + "/.."  ==> [./..]
+      // [foo]   is always [./foo] due to init above
+      // [*/..]  + "/.."  ==> [*/../..]
+      // [*/foo] + "/.."  ==> [*]
+      auto goParent_f =  [&](){
+	if ( _name.empty() )
+	  /*NOOP*/;
+	else if ( _name.size() == 1 ) // content is '.'
+	  _name += "/..";
+	else
+	{
+	  std::string::size_type pos = _name.rfind( "/" );
+	  if ( pos == _name.size() - 3 && _name[pos+1] == '.' && _name[pos+2] == '.' )
+	    _name += "/..";
+	  else
+	    _name.erase( pos );
+	}
+      };
+
+      for ( auto ch : name_r )
+      {
+	switch ( ch )
+	{
+	  case '/':
+	    switch ( pending )
+	    {
+	      case P_none:	pending = P_slash; break;
+	      case P_slash:	break;
+	      case P_dot1:	pending = P_slash; break;
+	      case P_dot2:	goParent_f(); pending = P_slash; break;
+	    }
+	    break;
+
+	  case '.':
+	    switch ( pending )
+	    {
+	      case P_none:	_name += '.'; break;
+	      case P_slash:	pending = P_dot1; break;
+	      case P_dot1:	pending = P_dot2; break;
+	      case P_dot2:	_name += "/..."; pending = P_none; break;
+	    }
+	    break;
+
+	  default:
+	    switch ( pending )
+	    {
+	      case P_none:	break;
+	      case P_slash:	_name += '/';	 pending = P_none; break;
+	      case P_dot1:	_name += "/.";	 pending = P_none; break;
+	      case P_dot2:	_name += "/.."; pending = P_none; break;
+	    }
+	    _name += ch;
+	    break;
+	}
       }
 
-      do {
-        switch ( *R_pci ) {
-        case '/':
-        case '\0':
-          if ( W_pci != Buf_aci ) {
-            *W_pci = '\0';
-            W_pci = Buf_aci;
-            Stack_Ci.Push( Buf_aci );
-          }
-          break;
-
-        default:
-          *W_pci++ = *R_pci;
-          break;
-        }
-      } while( *R_pci++ );
-
-      delete[] Buf_aci;
-      name_t = Tprfx + Stack_Ci.str();
+      switch ( pending )
+      {
+	case P_none:	break;
+	case P_slash:	if ( _name.empty() ) _name = "/"; break;
+	case P_dot1:	if ( _name.empty() ) _name = "/"; break;
+	case P_dot2:	goParent_f(); if ( _name.empty() ) _name = "/"; break;
+      }
+      return;
     }
 
     ///////////////////////////////////////////////////////////////////
@@ -187,22 +125,20 @@ namespace zypp
     //	METHOD NAME : Pathname::dirname
     //	METHOD TYPE : Pathname
     //
-    Pathname Pathname::dirname( const Pathname & name_tv )
+    Pathname Pathname::dirname( const Pathname & name_r )
     {
-      if ( name_tv.empty() )
-        return "";
+      if ( name_r.empty() )
+        return Pathname();
 
-      Pathname ret_t( name_tv );
-      string::size_type idx = ret_t.name_t.find_last_of( '/' );
+      Pathname ret_t( name_r );
+      string::size_type idx = ret_t._name.find_last_of( '/' );
 
       if ( idx == string::npos ) {
-        ret_t.name_t.erase( ret_t.prfx_i );
-        ret_t.name_t += ".";
-      } else if ( idx == ret_t.prfx_i ) {
-        ret_t.name_t.erase( ret_t.prfx_i );
-        ret_t.name_t += "/";
+        ret_t._name = ".";
+      } else if ( idx == 0 ) {
+        ret_t._name = "/";
       } else {
-        ret_t.name_t.erase( idx );
+        ret_t._name.erase( idx );
       }
 
       return ret_t;
@@ -213,15 +149,14 @@ namespace zypp
     //	METHOD NAME : Pathname::basename
     //	METHOD TYPE : string
     //
-    string Pathname::basename( const Pathname & name_tv )
+    string Pathname::basename( const Pathname & name_r )
     {
-      if ( name_tv.empty() )
+      if ( name_r.empty() )
         return string();
 
-      string ret_t( name_tv.asString() );
-      ret_t.erase( 0, name_tv.prfx_i );
+      string ret_t( name_r.asString() );
       string::size_type idx = ret_t.find_last_of( '/' );
-      if ( idx != string::npos ) {
+      if ( idx != string::npos && ( idx != 0 || ret_t.size() != 1 ) ) {
         ret_t.erase( 0, idx+1 );
       }
 
@@ -233,12 +168,23 @@ namespace zypp
     //	METHOD NAME : Pathname::asUrl
     //	METHOD TYPE : Url
     //
-    Url Pathname::asUrl() const
+    Url Pathname::asUrl( const std::string & scheme_r ) const
     {
-      Url ret( "dir:///" );
+      Url ret;
       ret.setPathName( asString() );
+      ret.setScheme( scheme_r );
       return ret;
     }
+
+    Url Pathname::asUrl() const
+    { return asUrl( "dir" ); }
+
+    Url Pathname::asDirUrl() const
+    { return asUrl( "dir" ); }
+
+    Url Pathname::asFileUrl() const
+    { return asUrl( "file" ); }
+
 
     std::string Pathname::showRoot( const Pathname & root_r, const Pathname & path_r )
     {
@@ -257,15 +203,27 @@ namespace zypp
     //	METHOD NAME : Pathname::extension
     //	METHOD TYPE : string
     //
-    string Pathname::extension( const Pathname & name_tv )
+    string Pathname::extension( const Pathname & name_r )
     {
-      if ( name_tv.empty() )
+      if ( name_r.empty() )
         return string();
 
-      string base( basename( name_tv ) );
+      string base( basename( name_r ) );
       string::size_type pos = base.rfind( '.' );
-      if ( pos == string::npos )
-        return string();
+      switch ( pos )
+      {
+	case 0:
+	  if ( base.size() == 1 )			// .
+	    return string();
+	  break;
+	case 1:
+	  if ( base.size() == 2 && base[0] == '.' )	// ..
+	    return string();
+	  break;
+	case string::npos:
+	  return string();
+	  break;
+      }
       return base.substr( pos );
     }
 
@@ -288,17 +246,17 @@ namespace zypp
     //	METHOD NAME : Pathname::cat
     //	METHOD TYPE : Pathname
     //
-    Pathname Pathname::cat( const Pathname & name_tv, const Pathname & add_tv )
+    Pathname Pathname::cat( const Pathname & name_r, const Pathname & add_tv )
     {
       if ( add_tv.empty() )
-        return name_tv;
-      if ( name_tv.empty() )
+        return name_r;
+      if ( name_r.empty() )
         return add_tv;
 
-      string ret_ti( add_tv.asString() );
-      ret_ti.replace( 0, add_tv.prfx_i, "/" );
-
-      return name_tv.asString() + ret_ti;
+      string ret_ti( name_r._name );
+      if( add_tv._name[0] != '/' )
+	ret_ti += '/';
+      return ret_ti + add_tv._name;
     }
 
     ///////////////////////////////////////////////////////////////////

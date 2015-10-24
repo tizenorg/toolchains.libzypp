@@ -35,8 +35,7 @@ namespace zypp {
     ExternalProgram::ExternalProgram()
       : use_pty (false)
       , pid( -1 )
-    {
-    }
+    {}
 
 
     ExternalProgram::ExternalProgram( std::string commandline,
@@ -54,70 +53,53 @@ namespace zypp {
       argv[2] = commandline.c_str();
       argv[3] = 0;
 
-      const char* rootdir = NULL;
-      if(!root.empty() && root != "/")
-      {
-    	rootdir = root.asString().c_str();
-      }
-      Environment environment;
-      start_program (argv, environment, stderr_disp, stderr_fd, default_locale, rootdir);
+      start_program( argv, Environment(), stderr_disp, stderr_fd, default_locale, root.c_str() );
     }
 
 
-    ExternalProgram::ExternalProgram (const Arguments &argv,
+    ExternalProgram::ExternalProgram( const Arguments & argv,
                                       Stderr_Disposition stderr_disp,
-                                      bool use_pty, int stderr_fd,
+                                      bool use_pty,
+				      int stderr_fd,
                                       bool default_locale,
-                                      const Pathname& root)
+                                      const Pathname & root )
       : use_pty (use_pty)
       , pid( -1 )
     {
-        const char * argvp[argv.size() + 1];
-        unsigned c = 0;
-        for_( i, argv.begin(), argv.end() )
-        {
-            argvp[c] = i->c_str();
-            ++c;
-        }
-        argvp[c] = 0;
+      const char * argvp[argv.size() + 1];
+      unsigned c = 0;
+      for_( i, argv.begin(), argv.end() )
+      {
+	argvp[c] = i->c_str();
+	++c;
+      }
+      argvp[c] = 0;
 
-        Environment environment;
-        const char* rootdir = NULL;
-        if(!root.empty() && root != "/")
-        {
-            rootdir = root.asString().c_str();
-        }
-        start_program (argvp, environment, stderr_disp, stderr_fd, default_locale, rootdir);
+      start_program( argvp, Environment(), stderr_disp, stderr_fd, default_locale, root.c_str() );
     }
 
 
-    ExternalProgram::ExternalProgram (const Arguments &argv,
+    ExternalProgram::ExternalProgram( const Arguments & argv,
                                       const Environment & environment,
                                       Stderr_Disposition stderr_disp,
-                                      bool use_pty, int stderr_fd,
+                                      bool use_pty,
+				      int stderr_fd,
                                       bool default_locale,
-                                      const Pathname& root)
+				      const Pathname & root )
       : use_pty (use_pty)
       , pid( -1 )
     {
-        const char * argvp[argv.size() + 1];
-        unsigned c = 0;
-        for_( i, argv.begin(), argv.end() )
-        {
-            argvp[c] = i->c_str();
-            ++c;
-        }
-        argvp[c] = 0;
+      const char * argvp[argv.size() + 1];
+      unsigned c = 0;
+      for_( i, argv.begin(), argv.end() )
+      {
+	argvp[c] = i->c_str();
+	++c;
+      }
+      argvp[c] = 0;
 
-        const char* rootdir = NULL;
-        if(!root.empty() && root != "/")
-        {
-            rootdir = root.asString().c_str();
-        }
-        start_program (argvp, environment, stderr_disp, stderr_fd, default_locale, rootdir);
-
+      start_program( argvp, environment, stderr_disp, stderr_fd, default_locale, root.c_str() );
     }
-
 
 
 
@@ -130,34 +112,27 @@ namespace zypp {
       : use_pty (use_pty)
       , pid( -1 )
     {
-      const char* rootdir = NULL;
-      if(!root.empty() && root != "/")
-      {
-    	rootdir = root.asString().c_str();
-      }
-      Environment environment;
-      start_program (argv, environment, stderr_disp, stderr_fd, default_locale, rootdir);
+      start_program( argv, Environment(), stderr_disp, stderr_fd, default_locale, root.c_str() );
     }
 
 
-    ExternalProgram::ExternalProgram (const char *const *argv, const Environment & environment,
-    				  Stderr_Disposition stderr_disp, bool use_pty,
-    				  int stderr_fd, bool default_locale,
-    				  const Pathname& root)
+    ExternalProgram::ExternalProgram( const char *const * argv,
+				      const Environment & environment,
+				      Stderr_Disposition stderr_disp,
+				      bool use_pty,
+				      int stderr_fd,
+				      bool default_locale,
+				      const Pathname & root )
       : use_pty (use_pty)
       , pid( -1 )
     {
-      const char* rootdir = NULL;
-      if(!root.empty() && root != "/")
-      {
-    	rootdir = root.asString().c_str();
-      }
-      start_program (argv, environment, stderr_disp, stderr_fd, default_locale, rootdir);
+      start_program( argv, environment, stderr_disp, stderr_fd, default_locale, root.c_str() );
     }
 
 
-    ExternalProgram::ExternalProgram (const char *binpath, const char *const *argv_1,
-    				  bool use_pty)
+    ExternalProgram::ExternalProgram( const char *binpath,
+				      const char *const *argv_1,
+				      bool use_pty )
       : use_pty (use_pty)
       , pid( -1 )
     {
@@ -166,14 +141,15 @@ namespace zypp {
     	;
       const char *argv[i + 1];
       argv[0] = binpath;
-      memcpy (&argv[1], argv_1, (i - 1) * sizeof (char *));
-      Environment environment;
-      start_program (argv, environment);
+      memcpy( &argv[1], argv_1, (i - 1) * sizeof (char *) );
+      start_program( argv, Environment() );
     }
 
 
-    ExternalProgram::ExternalProgram (const char *binpath, const char *const *argv_1, const Environment & environment,
-    				  bool use_pty)
+    ExternalProgram::ExternalProgram( const char *binpath,
+				      const char *const *argv_1,
+				      const Environment & environment,
+				      bool use_pty )
       : use_pty (use_pty)
       , pid( -1 )
     {
@@ -182,33 +158,67 @@ namespace zypp {
     	;
       const char *argv[i + 1];
       argv[0] = binpath;
-      memcpy (&argv[1], argv_1, (i - 1) * sizeof (char *));
-      start_program (argv, environment);
+      memcpy( &argv[1], argv_1, (i - 1) * sizeof (char *) );
+      start_program( argv, environment );
     }
 
 
     ExternalProgram::~ExternalProgram()
-    {
-    }
+    {}
 
 
-    void
-    ExternalProgram::start_program (const char *const *argv, const Environment & environment,
-    				Stderr_Disposition stderr_disp,
-    				int stderr_fd, bool default_locale, const char* root)
+
+    void ExternalProgram::start_program( const char *const *argv,
+					 const Environment & environment,
+					 Stderr_Disposition stderr_disp,
+					 int stderr_fd,
+					 bool default_locale,
+					 const char * root )
     {
       pid = -1;
       _exitStatus = 0;
-      int to_external[2], from_external[2];  // fds for pair of pipes
-      int master_tty,	slave_tty;	   // fds for pair of ttys
+      int to_external[2], from_external[2];	// fds for pair of pipes
+      int master_tty,	slave_tty;		// fds for pair of ttys
 
-      const char * redirectStdin = 0;
-      if ( argv[0] && *argv[0] == '<' )
+      // retrieve options at beginning of arglist
+      const char * redirectStdin = nullptr;	// <[file]
+      const char * chdirTo = nullptr;		// #/[path]
+
+      if ( root )
       {
-        redirectStdin = argv[0]+1;
-        if ( *redirectStdin == '\0' )
-          redirectStdin = "/dev/null";
-        ++argv;
+	if ( root[0] == '\0' )
+	{
+	  root = nullptr;	// ignore empty root
+	}
+	else if ( root[0] == '/' && root[1] == '\0' )
+	{
+	  // If root is '/' do not chroot, but chdir to '/'
+	  // unless arglist defines another dir.
+	  chdirTo = "/";
+	  root = nullptr;
+	}
+      }
+
+      for ( bool strip = false; argv[0]; ++argv )
+      {
+	strip = false;
+	switch ( argv[0][0] )
+	{
+	  case '<':
+	    strip = true;
+	    redirectStdin = argv[0]+1;
+	    if ( *redirectStdin == '\0' )
+	      redirectStdin = "/dev/null";
+	    break;
+
+	  case '#':
+	    strip = true;
+	    if ( argv[0][1] == '/' )	// #/[path]
+	      chdirTo = argv[0]+1;
+	    break;
+	}
+	if ( ! strip )
+	  break;
       }
 
       // do not remove the single quotes around every argument, copy&paste of
@@ -324,13 +334,17 @@ namespace zypp {
                 std::cerr << _execError << endl;// After fork log on stderr too
     		_exit (128);			// No sense in returning! I am forked away!!
     	    }
-    	    if(chdir("/") == -1)
-    	    {
-                _execError = str::form( _("Can't chdir to '/' inside chroot (%s)."), strerror(errno) );
-                std::cerr << _execError << endl;// After fork log on stderr too
-    		_exit (128);			// No sense in returning! I am forked away!!
-    	    }
+	    if ( ! chdirTo )
+	      chdirTo = "/";
     	}
+
+	if ( chdirTo && chdir( chdirTo ) == -1 )
+	{
+	  _execError = root ? str::form( _("Can't chdir to '%s' inside chroot '%s' (%s)."), chdirTo, root, strerror(errno) )
+			    : str::form( _("Can't chdir to '%s' (%s)."), chdirTo, strerror(errno) );
+	  std::cerr << _execError << endl;// After fork log on stderr too
+	  _exit (128);			// No sense in returning! I am forked away!!
+	}
 
     	// close all filedesctiptors above stderr
     	for ( int i = ::getdtablesize() - 1; i > 2; --i ) {

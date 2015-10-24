@@ -14,8 +14,6 @@
 
 #include <iosfwd>
 
-#include "zypp/base/SafeBool.h"
-
 #include "zypp/sat/detail/PoolMember.h"
 #include "zypp/sat/SolvAttr.h"
 #include "zypp/ResTraits.h"
@@ -44,7 +42,7 @@ namespace zypp
     //
     /** A \ref Solvable object within the sat \ref Pool.
      *
-     * \note Unfortunately libsatsolver combines the objects kind and
+     * \note Unfortunately libsolv combines the objects kind and
      * name in a single identifier \c "pattern:kde_multimedia",
      * \b except for packages and source packes. They are not prefixed
      * by any kind string. Instead the architecture is abused to store
@@ -54,8 +52,7 @@ namespace zypp
      * packages as an own kind of solvable and map their arch to
      * \ref Arch_noarch.
      */
-    class Solvable : protected detail::PoolMember,
-                     private base::SafeBool<Solvable>
+    class Solvable : protected detail::PoolMember
     {
       public:
         typedef sat::detail::SolvableIdType IdType;
@@ -73,10 +70,9 @@ namespace zypp
         /** Represents no \ref Solvable. */
         static const Solvable noSolvable;
 
-#ifndef SWIG // Swig treats it as syntax error
         /** Evaluate \ref Solvable in a boolean context (\c != \c noSolvable). */
-        using base::SafeBool<Solvable>::operator bool_type;
-#endif
+        explicit operator bool() const
+        { return get(); }
 
         /** Return whether this \ref Solvable belongs to the system repo.
          * \note This includes the otherwise hidden systemSolvable.
@@ -121,7 +117,7 @@ namespace zypp
          * returns the numeric attribute value for \ref attr
          * or 0 if it does not exists.
          */
-        unsigned lookupNumAttribute( const SolvAttr & attr ) const;
+        unsigned long long lookupNumAttribute( const SolvAttr & attr ) const;
 
         /**
          * returns the boolean attribute value for \ref attr
@@ -189,6 +185,9 @@ namespace zypp
          * \endcode
         */
         std::string asString() const;
+
+	/** String representation <tt>"ident-edition.arch(repo)"</tt> or \c "noSolvable" */
+        std::string asUserString() const;
 
         /** Test whether two Solvables have the same content.
          * Basically the same name, edition, arch, vendor and buildtime.
@@ -276,14 +275,6 @@ namespace zypp
             ResKind  kind()  const { return _kind; }
             IdString name()  const { return _name; }
 
-	    /** Return an idents explicit kind prefix, or \ref ResKind() if none.
-	     * Mainly to detect wheter a given ident string is explicitly prefixed
-	     * by a known kind (e.g \c pattern:foo or \c package:foo).
-	     */
-	    static ResKind explicitKind( IdString ident_r )		{ return explicitKind( ident_r.c_str() );  }
-	    static ResKind explicitKind( const char * ident_r );
-	    static ResKind explicitKind( const std::string & ident_r )	{ return explicitKind( ident_r.c_str() );  }
-
           private:
             IdString  _ident;
             ResKind   _kind;
@@ -295,11 +286,7 @@ namespace zypp
         ::_Solvable * get() const;
         /** Expert backdoor. */
         IdType id() const { return _id; }
-      private:
-#ifndef SWIG // Swig treats it as syntax error
-        friend base::SafeBool<Solvable>::operator bool_type() const;
-#endif
-        bool boolTest() const { return get(); }
+
       private:
         IdType _id;
     };
@@ -310,6 +297,9 @@ namespace zypp
 
     /** \relates Solvable More verbose stream output including dependencies */
     std::ostream & dumpOn( std::ostream & str, const Solvable & obj );
+
+    /** \relates Solvable XML output */
+    std::ostream & dumpAsXmlOn( std::ostream & str, const Solvable & obj );
 
     /** \relates Solvable */
     inline bool operator==( const Solvable & lhs, const Solvable & rhs )

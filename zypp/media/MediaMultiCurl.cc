@@ -30,6 +30,9 @@
 using namespace std;
 using namespace zypp::base;
 
+#undef CURLVERSION_AT_LEAST
+#define CURLVERSION_AT_LEAST(M,N,O) LIBCURL_VERSION_NUM >= ((((M)<<8)+(N))<<8)+(O)
+
 namespace zypp {
   namespace media {
 
@@ -250,7 +253,7 @@ multifetchworker::headerfunction(char *p, size_t size)
       string line(p + 9, l - 9);
       if (line[l - 10] == '\r')
 	line.erase(l - 10, 1);
-      DBG << "#" << _workerno << ": redirecting to" << line << endl;
+      XXX << "#" << _workerno << ": redirecting to" << line << endl;
       return size;
     }
   if (l <= 14 || l >= 128 || strncasecmp(p, "Content-Range:", 14) != 0)
@@ -278,7 +281,7 @@ multifetchworker::headerfunction(char *p, size_t size)
     }
   if (_request->_filesize != (off_t)filesize)
     {
-      DBG << "#" << _workerno << ": filesize mismatch" << endl;
+      XXX << "#" << _workerno << ": filesize mismatch" << endl;
       _state = WORKER_BROKEN;
       strncpy(_curlError, "filesize mismatch", CURL_ERROR_SIZE);
     }
@@ -317,7 +320,7 @@ multifetchworker::multifetchworker(int no, multifetchrequest &request, const Url
   _urlbuf = curlUrl.asString();
   _curl = _request->_context->fromEasyPool(_url.getHost());
   if (_curl)
-    DBG << "reused worker from pool" << endl;
+    XXX << "reused worker from pool" << endl;
   if (!_curl && !(_curl = curl_easy_init()))
     {
       _state = WORKER_BROKEN;
@@ -362,7 +365,7 @@ multifetchworker::multifetchworker(int no, multifetchrequest &request, const Url
 	  long auth = CurlAuthData::auth_type_str2long(use_auth);
 	  if( auth != CURLAUTH_NONE)
 	  {
-	    DBG << "#" << _workerno << ": Enabling HTTP authentication methods: " << use_auth
+	    XXX << "#" << _workerno << ": Enabling HTTP authentication methods: " << use_auth
 		<< " (CURLOPT_HTTPAUTH=" << auth << ")" << std::endl;
 	    curl_easy_setopt(_curl, CURLOPT_HTTPAUTH, auth);
 	  }
@@ -379,7 +382,7 @@ multifetchworker::~multifetchworker()
         curl_multi_remove_handle(_request->_multi, _curl);
       if (_state == WORKER_DONE || _state == WORKER_SLEEP)
 	{
-#if LIBCURL_VERSION_NUMBER >= 0x071505
+#if CURLVERSION_AT_LEAST(7,15,5)
 	  curl_easy_setopt(_curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t)0);
 #endif
 	  curl_easy_setopt(_curl, CURLOPT_PRIVATE, (void *)0);
@@ -451,7 +454,7 @@ multifetchworker::checkdns()
 	return;
     }
 
-  DBG << "checking DNS lookup of " << host << endl;
+  XXX << "checking DNS lookup of " << host << endl;
   int pipefds[2];
   if (pipe(pipefds))
     {
@@ -476,7 +479,7 @@ multifetchworker::checkdns()
       struct addrinfo *ai, aihints;
       memset(&aihints, 0, sizeof(aihints));
       aihints.ai_family = PF_UNSPEC;
-      int tstsock = socket(PF_INET6, SOCK_DGRAM, 0);
+      int tstsock = socket(PF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0);
       if (tstsock == -1)
 	aihints.ai_family = PF_INET;
       else
@@ -532,7 +535,7 @@ multifetchworker::dnsevent(fd_set &rset)
       return;
     }
   int exitcode = WEXITSTATUS(status);
-  DBG << "#" << _workerno << ": DNS lookup returned " << exitcode << endl;
+  XXX << "#" << _workerno << ": DNS lookup returned " << exitcode << endl;
   if (exitcode != 0)
     {
       _state = WORKER_BROKEN;
@@ -547,7 +550,7 @@ multifetchworker::dnsevent(fd_set &rset)
 bool
 multifetchworker::checkChecksum()
 {
-  // DBG << "checkChecksum block " << _blkno << endl;
+  // XXX << "checkChecksum block " << _blkno << endl;
   if (!_blksize || !_request->_blklist)
     return true;
   return _request->_blklist->verifyDigest(_blkno, _dig);
@@ -556,7 +559,7 @@ multifetchworker::checkChecksum()
 bool
 multifetchworker::recheckChecksum()
 {
-  // DBG << "recheckChecksum block " << _blkno << endl;
+  // XXX << "recheckChecksum block " << _blkno << endl;
   if (!_request->_fp || !_blksize || !_request->_blklist)
     return true;
   if (fseeko(_request->_fp, _blkstart, SEEK_SET))
@@ -581,7 +584,7 @@ multifetchworker::stealjob()
 {
   if (!_request->_stealing)
     {
-      DBG << "start stealing!" << endl;
+      XXX << "start stealing!" << endl;
       _request->_stealing = true;
     }
   multifetchworker *best = 0;
@@ -641,8 +644,8 @@ multifetchworker::stealjob()
 	}
 
       // lets see if we should sleep a bit
-      DBG << "me #" << _workerno << ": " << _avgspeed << ", size " << best->_blksize << endl;
-      DBG << "best #" << best->_workerno << ": " << best->_avgspeed << ", size " << (best->_blksize - best->_blkreceived) << endl;
+      XXX << "me #" << _workerno << ": " << _avgspeed << ", size " << best->_blksize << endl;
+      XXX << "best #" << best->_workerno << ": " << best->_avgspeed << ", size " << (best->_blksize - best->_blkreceived) << endl;
       if (_avgspeed && best->_avgspeed && best->_blksize - best->_blkreceived > 0 &&
           (best->_blksize - best->_blkreceived) * _avgspeed < best->_blksize * best->_avgspeed)
 	{
@@ -651,7 +654,7 @@ multifetchworker::stealjob()
 	  double sl = (best->_blksize - best->_blkreceived) / best->_avgspeed * 2;
 	  if (sl > 1)
 	    sl = 1;
-	  DBG << "#" << _workerno << ": going to sleep for " << sl * 1000 << " ms" << endl;
+	  XXX << "#" << _workerno << ": going to sleep for " << sl * 1000 << " ms" << endl;
 	  _sleepuntil = now + sl;
 	  _state = WORKER_SLEEP;
 	  _request->_sleepworkers++;
@@ -717,7 +720,7 @@ multifetchworker::nextjob()
   else
     {
       MediaBlock blk = blklist->getBlock(_request->_blkno);
-      while (_request->_blkoff >= blk.off + blk.size)
+      while (_request->_blkoff >= (off_t)(blk.off + blk.size))
 	{
 	  if (++_request->_blkno == blklist->numBlocks())
 	    {
@@ -748,7 +751,7 @@ multifetchworker::run()
     sprintf(rangebuf, "%llu-", (unsigned long long)_blkstart);
   else
     sprintf(rangebuf, "%llu-%llu", (unsigned long long)_blkstart, (unsigned long long)_blkstart + _blksize - 1);
-  DBG << "#" << _workerno << ": BLK " << _blkno << ":" << rangebuf << " " << _url << endl;
+  XXX << "#" << _workerno << ": BLK " << _blkno << ":" << rangebuf << " " << _url << endl;
   if (curl_easy_setopt(_curl, CURLOPT_RANGE, !_noendrange || _blkstart != 0 ? rangebuf : (char *)0) != CURLE_OK)
     {
       _request->_activeworkers--;
@@ -843,11 +846,11 @@ multifetchrequest::run(std::vector<Url> &urllist)
 
       if (_finished)
 	{
-	  DBG << "finished!" << endl;
+	  XXX << "finished!" << endl;
 	  break;
 	}
 
-      if (_activeworkers < _maxworkers && urliter != urllist.end() && _workers.size() < MAXURLS)
+      if ((int)_activeworkers < _maxworkers && urliter != urllist.end() && _workers.size() < MAXURLS)
 	{
 	  // spawn another worker!
 	  multifetchworker *worker = new multifetchworker(workerno++, *this, *urliter);
@@ -968,7 +971,7 @@ multifetchrequest::run(std::vector<Url> &urllist)
 		continue;
 	      if (_minsleepuntil == worker->_sleepuntil)
 		_minsleepuntil = 0;
-	      DBG << "#" << worker->_workerno << ": sleep done, wake up" << endl;
+	      XXX << "#" << worker->_workerno << ": sleep done, wake up" << endl;
 	      _sleepworkers--;
 	      // nextjob chnages the state
 	      worker->nextjob();
@@ -993,20 +996,20 @@ multifetchrequest::run(std::vector<Url> &urllist)
 	      else
 		worker->_avgspeed = worker->_blkreceived / (now - worker->_blkstarttime);
 	    }
-	  DBG << "#" << worker->_workerno << ": BLK " << worker->_blkno << " done code " << cc << " speed " << worker->_avgspeed << endl;
+	  XXX << "#" << worker->_workerno << ": BLK " << worker->_blkno << " done code " << cc << " speed " << worker->_avgspeed << endl;
 	  curl_multi_remove_handle(_multi, easy);
 	  if (cc == CURLE_HTTP_RETURNED_ERROR)
 	    {
 	      long statuscode = 0;
 	      (void)curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &statuscode);
-	      DBG << "HTTP status " << statuscode << endl;
+	      XXX << "HTTP status " << statuscode << endl;
 	      if (statuscode == 416 && !_blklist)	/* Range error */
 		{
 		  if (_filesize == off_t(-1))
 		    {
 		      if (!worker->_noendrange)
 			{
-			  DBG << "#" << worker->_workerno << ": retrying with no end range" << endl;
+			  XXX << "#" << worker->_workerno << ": retrying with no end range" << endl;
 			  worker->_noendrange = true;
 			  worker->run();
 			  continue;
@@ -1042,7 +1045,7 @@ multifetchrequest::run(std::vector<Url> &urllist)
 		      // with something broken. Thus we have to re-check the block.
 		      if (!worker->recheckChecksum())
 			{
-			  DBG << "#" << worker->_workerno << ": recheck checksum error, refetch block" << endl;
+			  XXX << "#" << worker->_workerno << ": recheck checksum error, refetch block" << endl;
 			  // re-fetch! No need to worry about the bad workers,
 			  // they will now be set to DISCARD. At the end of their block
 			  // they will notice that they wrote bad data and go into BROKEN.
@@ -1078,7 +1081,7 @@ multifetchrequest::run(std::vector<Url> &urllist)
 		    ratio = ratio * ratio;
 		  if (ratio > .01)
 		    {
-		      DBG << "#" << worker->_workerno << ": too slow ("<< ratio << ", " << worker->_avgspeed << ", #" << maxworkerno << ": " << maxavg << "), going to sleep for " << ratio * 1000 << " ms" << endl;
+		      XXX << "#" << worker->_workerno << ": too slow ("<< ratio << ", " << worker->_avgspeed << ", #" << maxworkerno << ": " << maxavg << "), going to sleep for " << ratio * 1000 << " ms" << endl;
 		      worker->_sleepuntil = now + ratio;
 		      worker->_state = WORKER_SLEEP;
 		      _sleepworkers++;
@@ -1099,7 +1102,7 @@ multifetchrequest::run(std::vector<Url> &urllist)
 		  if (avg < 1024)
 		    avg = 1024;
 		  worker->_maxspeed = avg;
-#if LIBCURL_VERSION_NUMBER >= 0x071505
+#if CURLVERSION_AT_LEAST(7,15,5)
 		  curl_easy_setopt(worker->_curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t)(avg));
 #endif
 		}
@@ -1196,15 +1199,12 @@ void MediaMultiCurl::setupEasy()
   _customHeadersMetalink = curl_slist_append(_customHeadersMetalink, "Accept: */*, application/metalink+xml, application/metalink4+xml");
 }
 
-static bool looks_like_metalink(const Pathname & file)
+static bool looks_like_metalink_fd(int fd)
 {
   char buf[256], *p;
-  int fd, l;
-  if ((fd = open(file.asString().c_str(), O_RDONLY)) == -1)
-    return false;
-  while ((l = read(fd, buf, sizeof(buf) - 1)) == -1 && errno == EINTR)
+  int l;
+  while ((l = pread(fd, buf, sizeof(buf) - 1, (off_t)0)) == -1 && errno == EINTR)
     ;
-  close(fd);
   if (l == -1)
     return 0;
   buf[l] = 0;
@@ -1221,8 +1221,64 @@ static bool looks_like_metalink(const Pathname & file)
 	p++;
     }
   bool ret = !strncasecmp(p, "<metalink", 9) ? true : false;
+  return ret;
+}
+
+static bool looks_like_metalink(const Pathname & file)
+{
+  int fd;
+  if ((fd = open(file.asString().c_str(), O_RDONLY|O_CLOEXEC)) == -1)
+    return false;
+  bool ret = looks_like_metalink_fd(fd);
+  close(fd);
   DBG << "looks_like_metalink(" << file << "): " << ret << endl;
   return ret;
+}
+
+// here we try to suppress all progress coming from a metalink download
+int MediaMultiCurl::progressCallback( void *clientp, double dltotal, double dlnow, double ultotal, double ulnow)
+{
+  CURL *_curl = MediaCurl::progressCallback_getcurl(clientp);
+  if (!_curl)
+    return 0;
+
+  // work around curl bug that gives us old data
+  long httpReturnCode = 0;
+  if (curl_easy_getinfo(_curl, CURLINFO_RESPONSE_CODE, &httpReturnCode ) != CURLE_OK || httpReturnCode == 0)
+    return 0;
+
+  char *ptr = NULL;
+  bool ismetalink = false;
+  if (curl_easy_getinfo(_curl, CURLINFO_CONTENT_TYPE, &ptr) == CURLE_OK && ptr) 
+    {    
+      string ct = string(ptr);
+      if (ct.find("application/metalink+xml") == 0 || ct.find("application/metalink4+xml") == 0)
+        ismetalink = true;
+    }    
+  if (!ismetalink && dlnow < 256)
+    {
+      // can't tell yet, suppress callback
+      return 0;
+    }
+  if (!ismetalink)
+    {
+      FILE *fp = 0;
+      if (curl_easy_getinfo(_curl, CURLINFO_PRIVATE, &fp) != CURLE_OK)
+	return 0;
+      if (!fp)
+	return 0;	/* hmm */
+      fflush(fp);
+      ismetalink = looks_like_metalink_fd(fileno(fp));
+      DBG << "looks_like_metalink_fd: " << ismetalink << endl;
+    }
+  if (ismetalink)
+    {
+      // we're downloading the metalink file. no progress please.
+      curl_easy_setopt(_curl, CURLOPT_NOPROGRESS, 1L);
+      return 0;
+    }
+  curl_easy_setopt(_curl, CURLOPT_PROGRESSFUNCTION, &MediaCurl::progressCallback);
+  return MediaCurl::progressCallback(clientp, dltotal, dlnow, ultotal, ulnow);
 }
 
 void MediaMultiCurl::doGetFileCopy( const Pathname & filename , const Pathname & target, callback::SendReport<DownloadProgressReport> & report, RequestOptions options ) const
@@ -1243,7 +1299,7 @@ void MediaMultiCurl::doGetFileCopy( const Pathname & filename , const Pathname &
     ZYPP_THROW(MediaSystemException(url, "out of memory for temp file name"));
   }
 
-  int tmp_fd = ::mkstemp( buf );
+  int tmp_fd = ::mkostemp( buf, O_CLOEXEC );
   if( tmp_fd == -1)
   {
     free( buf);
@@ -1253,7 +1309,7 @@ void MediaMultiCurl::doGetFileCopy( const Pathname & filename , const Pathname &
   destNew = buf;
   free( buf);
 
-  FILE *file = ::fdopen( tmp_fd, "w" );
+  FILE *file = ::fdopen( tmp_fd, "we" );
   if ( !file ) {
     ::close( tmp_fd);
     filesystem::unlink( destNew );
@@ -1276,6 +1332,9 @@ void MediaMultiCurl::doGetFileCopy( const Pathname & filename , const Pathname &
   }
   // change header to include Accept: metalink
   curl_easy_setopt(_curl, CURLOPT_HTTPHEADER, _customHeadersMetalink);
+  // change to our own progress funcion
+  curl_easy_setopt(_curl, CURLOPT_PROGRESSFUNCTION, &progressCallback);
+  curl_easy_setopt(_curl, CURLOPT_PRIVATE, file);
   try
     {
       MediaCurl::doGetFileCopyFile(filename, dest, file, report, options);
@@ -1287,11 +1346,13 @@ void MediaMultiCurl::doGetFileCopy( const Pathname & filename , const Pathname &
       curl_easy_setopt(_curl, CURLOPT_TIMECONDITION, CURL_TIMECOND_NONE);
       curl_easy_setopt(_curl, CURLOPT_TIMEVALUE, 0L);
       curl_easy_setopt(_curl, CURLOPT_HTTPHEADER, _customHeaders);
+      curl_easy_setopt(_curl, CURLOPT_PRIVATE, (void *)0);
       ZYPP_RETHROW(ex);
     }
   curl_easy_setopt(_curl, CURLOPT_TIMECONDITION, CURL_TIMECOND_NONE);
   curl_easy_setopt(_curl, CURLOPT_TIMEVALUE, 0L);
   curl_easy_setopt(_curl, CURLOPT_HTTPHEADER, _customHeaders);
+  curl_easy_setopt(_curl, CURLOPT_PRIVATE, (void *)0);
   long httpReturnCode = 0;
   CURLcode infoRet = curl_easy_getinfo(_curl, CURLINFO_RESPONSE_CODE, &httpReturnCode);
   if (infoRet == CURLE_OK)
@@ -1340,29 +1401,29 @@ void MediaMultiCurl::doGetFileCopy( const Pathname & filename , const Pathname &
 	  mlp.parse(Pathname(destNew));
 	  MediaBlockList bl = mlp.getBlockList();
 	  vector<Url> urls = mlp.getUrls();
-	  DBG << bl << endl;
-	  file = fopen(destNew.c_str(), "w+");
+	  XXX << bl << endl;
+	  file = fopen(destNew.c_str(), "w+e");
 	  if (!file)
 	    ZYPP_THROW(MediaWriteException(destNew));
 	  if (PathInfo(target).isExist())
 	    {
-	      DBG << "reusing blocks from file " << target << endl;
+	      XXX << "reusing blocks from file " << target << endl;
 	      bl.reuseBlocks(file, target.asString());
-	      DBG << bl << endl;
+	      XXX << bl << endl;
 	    }
 	  if (bl.haveChecksum(1) && PathInfo(failedFile).isExist())
 	    {
-	      DBG << "reusing blocks from file " << failedFile << endl;
+	      XXX << "reusing blocks from file " << failedFile << endl;
 	      bl.reuseBlocks(file, failedFile.asString());
-	      DBG << bl << endl;
+	      XXX << bl << endl;
 	      filesystem::unlink(failedFile);
 	    }
 	  Pathname df = deltafile();
 	  if (!df.empty())
 	    {
-	      DBG << "reusing blocks from file " << df << endl;
+	      XXX << "reusing blocks from file " << df << endl;
 	      bl.reuseBlocks(file, df.asString());
-	      DBG << bl << endl;
+	      XXX << bl << endl;
 	    }
 	  try
 	    {
@@ -1390,7 +1451,7 @@ void MediaMultiCurl::doGetFileCopy( const Pathname & filename , const Pathname &
 	      filesystem::unlink(destNew);
 	      ZYPP_RETHROW(ex);
 	    }
-	  file = fopen(destNew.c_str(), "w+");
+	  file = fopen(destNew.c_str(), "w+e");
 	  if (!file)
 	    ZYPP_THROW(MediaWriteException(destNew));
 	  MediaCurl::doGetFileCopyFile(filename, dest, file, report, options | OPTION_NO_REPORT_START);
@@ -1450,7 +1511,7 @@ void MediaMultiCurl::multifetch(const Pathname & filename, FILE *fp, std::vector
       try
 	{
 	  string scheme = urliter->getScheme();
-	  if (scheme == "http" || scheme == "https" || scheme == "ftp")
+	  if (scheme == "http" || scheme == "https" || scheme == "ftp" || scheme == "tftp")
 	    {
 	      checkProtocol(*urliter);
 	      myurllist.push_back(*urliter);

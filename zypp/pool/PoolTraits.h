@@ -40,7 +40,21 @@ namespace zypp
     struct ByPoolItem
     {
       bool operator()( const PoolItem & pi ) const
-      { return pi; }
+      { return bool(pi); }
+    };
+
+    /** In CXX0X std::_Select2nd does no longer derive from std::unary_function
+     */
+    template<typename _Pair>
+    struct P_Select2nd : public std::unary_function<_Pair, typename _Pair::second_type>
+    {
+      typename _Pair::second_type&
+      operator()(_Pair& __x) const
+      { return __x.second; }
+
+      const typename _Pair::second_type&
+      operator()(const _Pair& __x) const
+      { return __x.second; }
     };
 
     ///////////////////////////////////////////////////////////////////
@@ -63,16 +77,12 @@ namespace zypp
       /** ident index */
       typedef std::tr1::unordered_multimap<sat::detail::IdType, PoolItem>
                                                         Id2ItemT;
-      typedef std::_Select2nd<Id2ItemT::value_type>     Id2ItemValueSelector;
+      typedef P_Select2nd<Id2ItemT::value_type>         Id2ItemValueSelector;
       typedef transform_iterator<Id2ItemValueSelector, Id2ItemT::const_iterator>
                                                         byIdent_iterator;
 
       /** list of known Repositories */
       typedef sat::Pool::RepositoryIterator	        repository_iterator;
-
-      /** soft locks */
-      typedef std::tr1::unordered_set<IdString>		AutoSoftLocks;
-      typedef AutoSoftLocks::const_iterator             autoSoftLocks_iterator;
 
       /** hard locks from etc/zypp/locks */
       typedef std::list<PoolQuery>			HardLockQueries;

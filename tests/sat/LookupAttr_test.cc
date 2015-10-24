@@ -1,6 +1,6 @@
 #include "TestSetup.h"
 #include <zypp/sat/LookupAttr.h>
-#include <zypp/sat/AttrMatcher.h>
+#include <zypp/base/StrMatcher.h>
 #include <zypp/ResObjects.h>
 
 static TestSetup test( Arch_x86_64 );
@@ -8,11 +8,6 @@ static TestSetup test( Arch_x86_64 );
 // Must be the first test!
 BOOST_AUTO_TEST_CASE(bnc_435838)
 {
-  // On the fly check that findSystemRepo does not
-  // cause loading the SystemRepo. check 2 times.
-  BOOST_REQUIRE( ! test.satpool().findSystemRepo() );
-  BOOST_REQUIRE( ! test.satpool().findSystemRepo() );
-
   // empty @system to pool
   test.satpool().systemRepo();
   BOOST_REQUIRE( test.satpool().findSystemRepo() );
@@ -25,7 +20,7 @@ BOOST_AUTO_TEST_CASE(bnc_435838)
 
 BOOST_AUTO_TEST_CASE(LookupAttr_init)
 {
-  test.loadTarget(); // initialize and load target
+  //test.loadTarget(); // initialize and load target
   test.loadRepo( TESTS_SRC_DIR "/data/openSUSE-11.1" );
   test.loadRepo( TESTS_SRC_DIR "/data/obs_virtualbox_11_1" );
   test.loadRepo( TESTS_SRC_DIR "/data/11.0-update" );
@@ -59,10 +54,10 @@ BOOST_AUTO_TEST_CASE(LookupAttr_existingattr_matcher)
 {
   sat::LookupAttr q( sat::SolvAttr::name );
 
-  BOOST_CHECK_THROW( q.setAttrMatcher( sat::AttrMatcher("[]ypper",Match::REGEX) ), MatchInvalidRegexException );
-  BOOST_CHECK( ! q.attrMatcher() );
-  BOOST_CHECK_NO_THROW( q.setAttrMatcher( sat::AttrMatcher("[zZ]ypper",Match::REGEX) ) );
-  BOOST_CHECK( q.attrMatcher() );
+  BOOST_CHECK_THROW( q.setStrMatcher( StrMatcher("[]ypper",Match::REGEX) ), MatchInvalidRegexException );
+  BOOST_CHECK( ! q.strMatcher() );
+  BOOST_CHECK_NO_THROW( q.setStrMatcher( StrMatcher("[zZ]ypper",Match::REGEX) ) );
+  BOOST_CHECK( q.strMatcher() );
 
   BOOST_CHECK_EQUAL( q.size(), 9 );
   for_(it,q.begin(),q.end())

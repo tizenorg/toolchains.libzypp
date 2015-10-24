@@ -88,17 +88,22 @@ namespace zypp
         if ( ! lcent )
         {
           unsigned myid = 0;
-          // Compare this entry with the global vendor map.
-          // Reversed to get the longes prefix.
-          for ( VendorMap::reverse_iterator it = _vendorMap.rbegin(); it != _vendorMap.rend(); ++it )
-          {
-            if ( str::hasPrefix( lcvendor.c_str(), it->first ) )
-            {
-              myid = it->second;
-              break; // found
-            }
-          }
-          if ( ! myid )
+	  // bnc#812608: no pefix compare in opensuse namespace
+	  static const IdString openSUSE( "opensuse" );
+	  if ( lcvendor == openSUSE || ! str::hasPrefix( lcvendor.c_str(), openSUSE.c_str() ) )
+	  {
+	    // Compare this entry with the global vendor map.
+	    // Reversed to get the longest prefix.
+	    for ( VendorMap::reverse_iterator it = _vendorMap.rbegin(); it != _vendorMap.rend(); ++it )
+	    {
+	      if ( str::hasPrefix( lcvendor.c_str(), it->first ) )
+	      {
+		myid = it->second;
+		break; // found
+	      }
+	    }
+	  }
+	  if ( ! myid )
           {
             myid = --_nextId; // get a new class ID
           }
@@ -107,7 +112,7 @@ namespace zypp
         else
         {
           ent = lcent; // take the ID from the lowercased vendor string
-        }
+	}
       }
       return ent;
     }
@@ -125,17 +130,11 @@ namespace zypp
   {
       vendorGroupCounter = 1;
       Pathname vendorPath (ZConfig::instance().vendorPath());
-      try
       {
-	  Target_Ptr trg( getZYpp()->target() );
-	  if ( trg )
-	      vendorPath = trg->root() / vendorPath;
+	Target_Ptr trg( getZYpp()->getTarget() );
+	if ( trg )
+	  vendorPath = trg->root() / vendorPath;
       }
-      catch ( ... )
-      {
-	  // noop: Someone decided to let target() throw if the ptr is NULL ;(
-      }
-
       // creating entries
       addVendorDirectory (vendorPath);
 
@@ -164,14 +163,6 @@ namespace zypp
         _vendorMap["opensuse"] = suseit->second;
       }
 
-      // Take care 'opensuse build service' gets it's own class.
-      VendorMap::const_iterator obsit( _vendorMap.find("opensuse build service") );
-      if ( obsit == _vendorMap.end() )
-      {
-        _vendorMap["opensuse build service"] = ++vendorGroupCounter;
-      }
-
-
       MIL << *this << endl;
   }
 
@@ -189,7 +180,7 @@ namespace zypp
         if (nextId != vendorGroupCounter + 1 &&
             nextId != _vendorMap[*it])
         {
-		    // We have at least 3 groups which has to be mixed --> mix the third group to the first
+	  // We have at least 3 groups which has to be mixed --> mix the third group to the first
           unsigned int moveID = _vendorMap[*it];
           for_( itMap, _vendorMap.begin(), _vendorMap.end() )
           {

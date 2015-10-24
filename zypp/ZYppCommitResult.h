@@ -66,7 +66,9 @@ namespace zypp
 
     public:
       ZYppCommitResult();
+      ZYppCommitResult( const ZYppCommitResult & lhs_r );
       ZYppCommitResult( const Pathname & root_r );
+      ~ZYppCommitResult();
 
     public:
       /** Remembered root directory of the target.
@@ -159,32 +161,6 @@ namespace zypp
 	/** Whether an error ocurred (skipped streps are ok). */
 	bool noError() const
 	{ return transaction().actionEmpty( sat::Transaction::STEP_ERROR ); }
-      //@}
-
-    public:
-      /** \name Oldstlye interface to be removed asap.
-       * \deprecated PoolItem is not suitable for reporting errors about
-       * packages to be deteled, as reloading the rpm database after commit
-       * invalidates them.
-       */
-      //@{
-      typedef std::list<PoolItem> PoolItemList;
-      /**
-       * number of committed resolvables
-       **/
-      int          _result ZYPP_DEPRECATED;
-      /**
-       * list of resolvables with error
-       **/
-      PoolItemList _errors ZYPP_DEPRECATED;
-      /**
-       * list of resolvables remaining (due to wrong media)
-       **/
-      PoolItemList _remaining ZYPP_DEPRECATED;
-      /**
-       * list of kind:source resolvables remaining (due to wrong media)
-       **/
-      PoolItemList _srcremaining ZYPP_DEPRECATED;
       //@}
 
     public:

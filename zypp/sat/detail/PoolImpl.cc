@@ -35,10 +35,10 @@
 
 extern "C"
 {
-// Workaround satsolver project not providing a common include
+// Workaround libsolv project not providing a common include
 // directory. (the -devel package does, but the git repo doesn't).
-// #include <satsolver/repo_helix.h>
-void repo_add_helix( ::Repo *repo, FILE *fp, int flags );
+// #include <solv/repo_helix.h>
+int repo_add_helix( ::Repo *repo, FILE *fp, int flags );
 }
 
 using std::endl;
@@ -48,7 +48,17 @@ using std::endl;
 
 // ///////////////////////////////////////////////////////////////////
 namespace zypp
-{ /////////////////////////////////////////////////////////////////
+{
+  /////////////////////////////////////////////////////////////////
+  namespace env
+  {
+    /**  */
+    inline int LIBSOLV_DEBUGMASK()
+    {
+      const char * envp = getenv("LIBSOLV_DEBUGMASK");
+      return envp ? str::strtonum<int>( envp ) : 0;
+    }
+  } // namespace env
   ///////////////////////////////////////////////////////////////////
   namespace sat
   { /////////////////////////////////////////////////////////////////
@@ -82,16 +92,23 @@ namespace zypp
         return _val;
       }
 
+      const Pathname & sysconfigStoragePath()
+      {
+	static const Pathname _val( "/etc/sysconfig/storage" );
+	return _val;
+      }
+
+
       /////////////////////////////////////////////////////////////////
 
       static void logSat( struct _Pool *, void *data, int type, const char *logString )
       {
-	  if ( type & (SAT_FATAL|SAT_ERROR) ) {
-	    _ERR("satsolver") << logString;
-	  } else if ( type & SAT_DEBUG_STATS ) {
-	    _DBG("satsolver") << logString;
+	  if ( type & (SOLV_FATAL|SOLV_ERROR) ) {
+	    _ERR("libsolv") << logString;
+	  } else if ( type & SOLV_DEBUG_STATS ) {
+	    _DBG("libsolv") << logString;
 	  } else {
-	    _MIL("satsolver") << logString;
+	    _MIL("libsolv") << logString;
 	  }
       }
 
@@ -131,26 +148,11 @@ namespace zypp
 
           case NAMESPACE_FILESYSTEM:
           {
-            static const Pathname sysconfigStoragePath( "/etc/sysconfig/storage" );
-            static WatchFile      sysconfigFile( sysconfigStoragePath, WatchFile::NO_INIT );
-            static std::set<std::string> requiredFilesystems;
-            if ( sysconfigFile.hasChanged() )
-            {
-              requiredFilesystems.clear();
-              str::split( base::sysconfig::read( sysconfigStoragePath )["USED_FS_LIST"],
-                          std::inserter( requiredFilesystems, requiredFilesystems.end() ) );
-            }
+	    const std::set<std::string> & requiredFilesystems( reinterpret_cast<PoolImpl*>(data)->requiredFilesystems() );
             return requiredFilesystems.find( IdString(rhs).asString() ) != requiredFilesystems.end() ? RET_systemProperty : RET_unsupported;
           }
           break;
 
-          case NAMESPACE_PRODUCTBUDDY:
-          {
-            PoolItem pi( (Solvable(rhs)) );
-            return( pi ? pi.buddy().id() : noId );
-          }
-
-          break;
         }
 
         WAR << "Unhandled " << Capability( lhs ) << " vs. " << Capability( rhs ) << endl;
@@ -182,12 +184,19 @@ namespace zypp
           ZYPP_THROW( Exception( _("Can not create sat-pool.") ) );
         }
         // initialialize logging
-	if ( getenv("ZYPP_LIBSAT_FULLLOG") )
-	  ::pool_setdebuglevel( _pool, 4 );
-	else if ( getenv("ZYPP_FULLLOG") )
-	  ::pool_setdebuglevel( _pool, 2 );
+	if ( env::LIBSOLV_DEBUGMASK() )
+	{
+	  ::pool_setdebugmask(_pool, env::LIBSOLV_DEBUGMASK() );
+	}
 	else
-	  ::pool_setdebugmask(_pool, SAT_DEBUG_JOB|SAT_DEBUG_STATS);
+	{
+	  if ( getenv("ZYPP_LIBSOLV_FULLLOG") || getenv("ZYPP_LIBSAT_FULLLOG") )
+	    ::pool_setdebuglevel( _pool, 3 );
+	  else if ( getenv("ZYPP_FULLLOG") )
+	    ::pool_setdebuglevel( _pool, 2 );
+	  else
+	    ::pool_setdebugmask(_pool, SOLV_DEBUG_JOB|SOLV_DEBUG_STATS );
+	}
 
         ::pool_setdebugcallback( _pool, logSat, NULL );
 
@@ -237,7 +246,7 @@ namespace zypp
 
       void PoolImpl::prepare() const
       {
-        if ( _watcher.remember( _serial ) )
+	if ( _watcher.remember( _serial ) )
         {
           // After repo/solvable add/remove:
           // set pool architecture
@@ -246,6 +255,7 @@ namespace zypp
         if ( ! _pool->whatprovides )
         {
           MIL << "pool_createwhatprovides..." << endl;
+
           ::pool_addfileprovides( _pool );
           ::pool_createwhatprovides( _pool );
         }
@@ -254,6 +264,19 @@ namespace zypp
 	  // initial seting
 	  const_cast<PoolImpl*>(this)->setTextLocale( ZConfig::instance().textLocale() );
         }
+      }
+
+      void PoolImpl::prepareForSolving() const
+      {
+	// additional /etc/sysconfig/storage check:
+	static WatchFile sysconfigFile( sysconfigStoragePath(), WatchFile::NO_INIT );
+	if ( sysconfigFile.hasChanged() )
+	{
+	  _requiredFilesystemsPtr.reset(); // recreated on demand
+	  const_cast<PoolImpl*>(this)->depSetDirty( "/etc/sysconfig/storage change" );
+	}
+	// finally prepare as usual:
+	prepare();
       }
 
       ///////////////////////////////////////////////////////////////////
@@ -270,19 +293,16 @@ namespace zypp
       void PoolImpl::_deleteRepo( ::_Repo * repo_r )
       {
         setDirty(__FUNCTION__, repo_r->name );
-        ::repo_free( repo_r, /*reuseids*/false );
-        eraseRepoInfo( repo_r );
 	if ( isSystemRepo( repo_r ) )
-	{
-	  // systemRepo added
-	  _onSystemByUserListPtr.reset(); // re-evaluate
-	}
+	  _autoinstalled.clear();
+        eraseRepoInfo( repo_r );
+        ::repo_free( repo_r, /*reuseids*/false );
       }
 
       int PoolImpl::_addSolv( ::_Repo * repo_r, FILE * file_r )
       {
         setDirty(__FUNCTION__, repo_r->name );
-        int ret = ::repo_add_solv( repo_r , file_r );
+        int ret = ::repo_add_solv( repo_r, file_r, 0 );
         if ( ret == 0 )
           _postRepoAdd( repo_r );
         return ret;
@@ -291,8 +311,9 @@ namespace zypp
       int PoolImpl::_addHelix( ::_Repo * repo_r, FILE * file_r )
       {
         setDirty(__FUNCTION__, repo_r->name );
-        ::repo_add_helix( repo_r , file_r, 0 ); // unfortunately void
-        _postRepoAdd( repo_r );
+        int ret = ::repo_add_helix( repo_r, file_r, 0 );
+        if ( ret == 0 )
+          _postRepoAdd( repo_r );
         return 0;
       }
 
@@ -307,7 +328,7 @@ namespace zypp
             for_( it, sysarchs.begin(), sysarchs.end() )
               sysids.insert( it->id() );
 
-              // unfortunately satsolver treats src/nosrc as architecture:
+              // unfortunately libsolv treats src/nosrc as architecture:
             sysids.insert( ARCH_SRC );
             sysids.insert( ARCH_NOSRC );
           }
@@ -338,11 +359,6 @@ namespace zypp
               blockBegin = blockSize = 0;
           }
         }
-        else
-	{
-	  // systemRepo added
-	  _onSystemByUserListPtr.reset(); // re-evaluate
-	}
       }
 
       detail::SolvableIdType PoolImpl::_addSolvables( ::_Repo * repo_r, unsigned count_r )
@@ -358,7 +374,7 @@ namespace zypp
         {
           bool dirty = false;
 
-          // satsolver priority is based on '<', while yum's repoinfo
+          // libsolv priority is based on '<', while yum's repoinfo
           // uses 1(highest)->99(lowest). Thus we use -info_r.priority.
           if ( repo->priority != int(-info_r.priority()) )
           {
@@ -531,72 +547,16 @@ namespace zypp
         }
       }
 
-      void PoolImpl::onSystemByUserListInit() const
+      const std::set<std::string> & PoolImpl::requiredFilesystems() const
       {
-	_onSystemByUserListPtr.reset( new OnSystemByUserList );
-	OnSystemByUserList & onSystemByUserList( *_onSystemByUserListPtr );
-
-	Pathname root( ZConfig::instance().systemRoot() );
-	if ( root.empty() )
+	if ( ! _requiredFilesystemsPtr )
 	{
-	  MIL << "Target not initialized." << endl;
-	  return;
+	  _requiredFilesystemsPtr.reset( new std::set<std::string> );
+	  std::set<std::string> & requiredFilesystems( *_requiredFilesystemsPtr );
+	  str::split( base::sysconfig::read( sysconfigStoragePath() )["USED_FS_LIST"],
+		      std::inserter( requiredFilesystems, requiredFilesystems.end() ) );
 	}
-	PathInfo pi( root / ZConfig::instance().historyLogFile() );
-	MIL << "onSystemByUserList from history: " << pi << endl;
-	if ( ! pi.isFile() )
-	  return;
-
-	// go and parse it: 'who' must constain an '@', then it was installed by user request.
-	// 2009-09-29 07:25:19|install|lirc-remotes|0.8.5-3.2|x86_64|root@opensuse|InstallationImage|a204211eb0...
-	std::ifstream infile( pi.path().c_str() );
-	for( iostr::EachLine in( infile ); in; in.next() )
-	{
-	  const char * ch( (*in).c_str() );
-	  // start with year
-	  if ( *ch < '1' || '9' < *ch )
-	    continue;
-	  const char * sep1 = ::strchr( ch, '|' );	// | after date
-	  if ( !sep1 )
-	    continue;
-	  ++sep1;
-	  // if logs an install or delete
-	  bool installs = true;
-	  if ( ::strncmp( sep1, "install|", 8 ) )
-	  {
-	    if ( ::strncmp( sep1, "remove |", 8 ) )
-	      continue; // no install and no remove
-	      else
-		installs = false; // remove
-	  }
-	  sep1 += 8;					// | after what
-	  // get the package name
-	  const char * sep2 = ::strchr( sep1, '|' );	// | after name
-	  if ( !sep2 || sep1 == sep2 )
-	    continue;
-	  (*in)[sep2-ch] = '\0';
-	  IdString pkg( sep1 );
-	  // we're done, if a delete
-	  if ( !installs )
-	  {
-	    onSystemByUserList.erase( pkg );
-	    continue;
-	  }
-	  // now guess whether user installed or not (3rd next field contains 'user@host')
-	  if ( (sep1 = ::strchr( sep2+1, '|' ))		// | after version
-	    && (sep1 = ::strchr( sep1+1, '|' ))		// | after arch
-	    && (sep2 = ::strchr( sep1+1, '|' )) )	// | after who
-	  {
-	    (*in)[sep2-ch] = '\0';
-	    if ( ::strchr( sep1+1, '@' ) )
-	    {
-	      // by user
-	      onSystemByUserList.insert( pkg );
-	      continue;
-	    }
-	  }
-	}
-	MIL << "onSystemByUserList found: " << onSystemByUserList.size() << endl;
+	return *_requiredFilesystemsPtr;
       }
 
       /////////////////////////////////////////////////////////////////

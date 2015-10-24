@@ -120,12 +120,16 @@ namespace zypp
    * a Callback light).
    * \li \c disconnect Disconnect this ReceiveReport in case it is
    * connected. If not connected nothing happens.
-   * \li \c connected Test wheter this ReceiveReport is currently
+   * \li \c connected Test whether this ReceiveReport is currently
    * connected.
    * \li \c whoIsConnected Return a 'ReceiveReport*' to the currently
    * connected ReceiveReport, or \c NULL if none is connected.
    *
-  */
+   * \par Passing Userdata via Callbacks
+   *
+   * For typesafe passing of user data via callbacks \see \ref UserData.
+   *
+   */
   namespace callback
   { /////////////////////////////////////////////////////////////////
 
@@ -221,6 +225,12 @@ namespace zypp
 
         ~SendReport()
         { Distributor::instance()->reportend(); }
+
+        static Receiver * whoIsConnected()
+        { return Distributor::instance().getReceiver(); }
+
+        static bool connected()
+        { return whoIsConnected(); }
 
         Distributor & operator->()
         { return Distributor::instance(); }

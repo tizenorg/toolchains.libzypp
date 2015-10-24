@@ -20,7 +20,6 @@
 #include "zypp/Package.h"
 #include "zypp/Changelog.h"
 #include "zypp/Pathname.h"
-#include "zypp/DiskUsage.h"
 
 
 namespace zypp
@@ -83,7 +82,8 @@ public:
 
   virtual ~RpmHeader();
 
-  bool isSrc() const;
+  bool isSrc() const;	//< Either 'src' or 'nosrc'
+  bool isNosrc() const;	//< Only 'nosrc'
 
 public:
 
@@ -125,11 +125,14 @@ public:
    * @see #tag_provides
    **/
   CapabilitySet tag_suggests( std::set<std::string> * freq_r = 0 ) const;
-  /** Unsupported by rpm.
+  /**
    * @see #tag_provides
    **/
-  CapabilitySet tag_supplements( std::set<std::string> * freq_r = 0 ) const
-  { return CapabilitySet(); }
+  CapabilitySet tag_supplements( std::set<std::string> * freq_r = 0 ) const;
+  /**
+   * @see #tag_provides
+   **/
+  CapabilitySet tag_recommends( std::set<std::string> * freq_r = 0 ) const;
 
   ByteCount tag_size()        const;
   ByteCount tag_archivesize() const;
@@ -145,9 +148,17 @@ public:
   std::string tag_url()          const;
   std::string tag_os()           const;
   std::string tag_prein()        const;
+  std::string tag_preinprog()    const;
   std::string tag_postin()       const;
+  std::string tag_postinprog()   const;
   std::string tag_preun()        const;
+  std::string tag_preunprog()    const;
   std::string tag_postun()       const;
+  std::string tag_postunprog()   const;
+  std::string tag_pretrans()     const;
+  std::string tag_pretransprog() const;
+  std::string tag_posttrans()    const;
+  std::string tag_posttransprog()const;
   std::string tag_sourcerpm()    const;
 
   /** just the list of names  */
@@ -160,11 +171,6 @@ public:
   std::list<FileInfo> tag_fileinfos() const;
 
   Changelog tag_changelog() const;
-
-  /**
-   * Returns reference to arg <code>dudata_r</code>.
-   **/
-  DiskUsage & tag_du( DiskUsage & dudata_r ) const;
 
 public:
 

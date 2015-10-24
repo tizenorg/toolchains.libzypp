@@ -21,7 +21,6 @@
 #include "zypp/base/Gettext.h"
 
 #include "zypp/media/MediaCurl.h"
-#include "zypp/media/proxyinfo/ProxyInfos.h"
 #include "zypp/media/ProxyInfo.h"
 #include "zypp/media/MediaUserAuth.h"
 #include "zypp/media/CredentialManager.h"
@@ -29,6 +28,7 @@
 #include "zypp/thread/Once.h"
 #include "zypp/Target.h"
 #include "zypp/ZYppFactory.h"
+#include "zypp/ZConfig.h"
 
 #include <cstdlib>
 #include <sys/types.h>
@@ -41,9 +41,12 @@
 
 #define  DETECT_DIR_INDEX       0
 #define  CONNECT_TIMEOUT        60
-#define  TRANSFER_TIMEOUT       60 * 3
 #define  TRANSFER_TIMEOUT_MAX   60 * 60
 
+#define EXPLICITLY_NO_PROXY "_none_"
+
+#undef CURLVERSION_AT_LEAST
+#define CURLVERSION_AT_LEAST(M,N,O) LIBCURL_VERSION_NUM >= ((((M)<<8)+(N))<<8)+(O)
 
 using namespace std;
 using namespace zypp::base;
@@ -154,9 +157,10 @@ namespace zypp {
   namespace {
     struct ProgressData
     {
-      ProgressData(const long _timeout, const zypp::Url &_url = zypp::Url(),
+      ProgressData(CURL *_curl, const long _timeout, const zypp::Url &_url = zypp::Url(),
                    callback::SendReport<DownloadProgressReport> *_report=NULL)
-        : timeout(_timeout)
+        : curl(_curl)
+        , timeout(_timeout)
         , reached(false)
         , report(_report)
         , drate_period(-1)
@@ -168,6 +172,7 @@ namespace zypp {
         , uload( 0)
         , url(_url)
       {}
+      CURL                                         *curl;
       long                                          timeout;
       bool                                          reached;
       callback::SendReport<DownloadProgressReport> *report;
@@ -235,7 +240,7 @@ void fillSettingsFromUrl( const Url &url, TransferSettings &s )
     else
     {
         // if there is no username, set anonymous auth
-        if ( url.getScheme() == "ftp" && s.username().empty() )
+        if ( ( url.getScheme() == "ftp" || url.getScheme() == "tftp" ) && s.username().empty() )
             s.setAnonymousAuth();
     }
 
@@ -273,50 +278,71 @@ void fillSettingsFromUrl( const Url &url, TransferSettings &s )
         }
     }
 
-    Pathname ca_path = Pathname(url.getQueryParam("ssl_capath")).asString();
+    Pathname ca_path( url.getQueryParam("ssl_capath") );
     if( ! ca_path.empty())
     {
-        if( !PathInfo(ca_path).isDir() || !Pathname(ca_path).absolute())
+        if( !PathInfo(ca_path).isDir() || ! ca_path.absolute())
             ZYPP_THROW(MediaBadUrlException(url, "Invalid ssl_capath path"));
         else
             s.setCertificateAuthoritiesPath(ca_path);
     }
 
-    string proxy = url.getQueryParam( "proxy" );
-    if ( ! proxy.empty() )
+    Pathname client_cert( url.getQueryParam("ssl_clientcert") );
+    if( ! client_cert.empty())
     {
-        if ( proxy == "_none_" ) {
+        if( !PathInfo(client_cert).isFile() || !client_cert.absolute())
+            ZYPP_THROW(MediaBadUrlException(url, "Invalid ssl_clientcert file"));
+        else
+            s.setClientCertificatePath(client_cert);
+    }
+
+    param = url.getQueryParam( "proxy" );
+    if ( ! param.empty() )
+    {
+        if ( param == EXPLICITLY_NO_PROXY ) {
+	    // Workaround TransferSettings shortcoming: With an
+	    // empty proxy string, code will continue to look for
+	    // valid proxy settings. So set proxy to some non-empty
+	    // string, to indicate it has been explicitly disabled.
+	    s.setProxy(EXPLICITLY_NO_PROXY);
             s.setProxyEnabled(false);
         }
         else {
             string proxyport( url.getQueryParam( "proxyport" ) );
             if ( ! proxyport.empty() ) {
-                proxy += ":" + proxyport;
+                param += ":" + proxyport;
             }
-            s.setProxy(proxy);
+            s.setProxy(param);
             s.setProxyEnabled(true);
         }
     }
 
+    param = url.getQueryParam( "proxyuser" );
+    if ( ! param.empty() )
+    {
+      s.setProxyUsername(param);
+      s.setProxyPassword(url.getQueryParam( "proxypass" ));
+    }
+
     // HTTP authentication type
-    string use_auth = url.getQueryParam("auth");
-    if (!use_auth.empty() && (url.getScheme() == "http" || url.getScheme() == "https"))
+    param = url.getQueryParam("auth");
+    if (!param.empty() && (url.getScheme() == "http" || url.getScheme() == "https"))
     {
         try
         {
-	    CurlAuthData::auth_type_str2long(use_auth);	// check if we know it
+	    CurlAuthData::auth_type_str2long(param);	// check if we know it
         }
         catch (MediaException & ex_r)
 	{
 	    DBG << "Rethrowing as MediaUnauthorizedException.";
 	    ZYPP_THROW(MediaUnauthorizedException(url, ex_r.msg(), "", ""));
 	}
-        s.setAuthType(use_auth);
+        s.setAuthType(param);
     }
 
     // workarounds
-    std::string head_requests( url.getQueryParam("head_requests"));
-    if( !head_requests.empty() && head_requests == "no")
+    param = url.getQueryParam("head_requests");
+    if( !param.empty() && param == "no" )
         s.setHeadRequestsAllowed(false);
 }
 
@@ -326,14 +352,24 @@ void fillSettingsFromUrl( const Url &url, TransferSettings &s )
  */
 void fillSettingsSystemProxy( const Url&url, TransferSettings &s )
 {
-#ifdef _WITH_LIBPROXY_SUPPORT_
-    ProxyInfo proxy_info (ProxyInfo::ImplPtr(new ProxyInfoLibproxy()));
-#else
-    ProxyInfo proxy_info (ProxyInfo::ImplPtr(new ProxyInfoSysconfig("proxy")));
-#endif
-    s.setProxyEnabled( proxy_info.useProxyFor( url ) );
-    if ( s.proxyEnabled() )
-      s.setProxy(proxy_info.proxy(url));
+    ProxyInfo proxy_info;
+    if ( proxy_info.useProxyFor( url ) )
+    {
+      // We must extract any 'user:pass' from the proxy url
+      // otherwise they won't make it into curl (.curlrc wins).
+      try {
+	Url u( proxy_info.proxy( url ) );
+	s.setProxy( u.asString( url::ViewOption::WITH_SCHEME + url::ViewOption::WITH_HOST + url::ViewOption::WITH_PORT ) );
+	// don't overwrite explicit auth settings
+	if ( s.proxyUsername().empty() )
+	{
+	  s.setProxyUsername( u.getUsername( url::E_ENCODED ) );
+	  s.setProxyPassword( u.getPassword( url::E_ENCODED ) );
+	}
+	s.setProxyEnabled( true );
+      }
+      catch (...) {}	// no proxy if URL is malformed
+    }
 }
 
 Pathname MediaCurl::_cookieFile = "/var/lib/YaST2/cookies";
@@ -459,11 +495,14 @@ Url MediaCurl::clearQueryString(const Url &url) const
   curlUrl.delQueryParam("proxypass");
   curlUrl.delQueryParam("ssl_capath");
   curlUrl.delQueryParam("ssl_verify");
+  curlUrl.delQueryParam("ssl_clientcert");
   curlUrl.delQueryParam("timeout");
   curlUrl.delQueryParam("auth");
   curlUrl.delQueryParam("username");
   curlUrl.delQueryParam("password");
   curlUrl.delQueryParam("mediahandler");
+  curlUrl.delQueryParam("credentials");
+  curlUrl.delQueryParam("head_requests");
   return curlUrl;
 }
 
@@ -536,7 +575,7 @@ void MediaCurl::setupEasy()
   vol_settings.addHeader(distributionFlavorHeader());
   vol_settings.addHeader("Pragma:");
 
-  _settings.setTimeout(TRANSFER_TIMEOUT);
+  _settings.setTimeout(ZConfig::instance().download_transfer_timeout());
   _settings.setConnectTimeout(CONNECT_TIMEOUT);
 
   _settings.setUserAgentString(agentString());
@@ -551,20 +590,24 @@ void MediaCurl::setupEasy()
       disconnectFrom();
       ZYPP_RETHROW(e);
   }
-
-  // if the proxy was not set by url, then look
+  // if the proxy was not set (or explicitly unset) by url, then look...
   if ( _settings.proxy().empty() )
   {
-      // at the system proxy settings
+      // ...at the system proxy settings
       fillSettingsSystemProxy(_url, _settings);
   }
-
-  DBG << "Proxy: " << (_settings.proxy().empty() ? "-none-" : _settings.proxy()) << endl;
 
  /**
   * Connect timeout
   */
   SET_OPTION(CURLOPT_CONNECTTIMEOUT, _settings.connectTimeout());
+  // If a transfer timeout is set, also set CURLOPT_TIMEOUT to an upper limit
+  // just in case curl does not trigger its progress callback frequently
+  // enough.
+  if ( _settings.timeout() )
+  {
+    SET_OPTION(CURLOPT_TIMEOUT, 3600L);
+  }
 
   // follow any Location: header that the server sends as part of
   // an HTTP header (#113275)
@@ -574,7 +617,7 @@ void MediaCurl::setupEasy()
 
   if ( _url.getScheme() == "https" )
   {
-#if LIBCURL_VERSION_NUMBER >= 0x071904
+#if CURLVERSION_AT_LEAST(7,19,4)
     // restrict following of redirections from https to https only
     SET_OPTION( CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS );
 #endif
@@ -585,6 +628,19 @@ void MediaCurl::setupEasy()
       SET_OPTION(CURLOPT_CAPATH, _settings.certificateAuthoritiesPath().c_str());
     }
 
+    if( ! _settings.clientCertificatePath().empty() )
+    {
+      SET_OPTION(CURLOPT_SSLCERT, _settings.clientCertificatePath().c_str());
+    }
+
+#ifdef CURLSSLOPT_ALLOW_BEAST
+    // see bnc#779177
+    ret = curl_easy_setopt( _curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_ALLOW_BEAST );
+    if ( ret != 0 ) {
+      disconnectFrom();
+      ZYPP_THROW(MediaCurlSetOptException(_url, _curlError));
+    }
+#endif
     SET_OPTION(CURLOPT_SSL_VERIFYPEER, _settings.verifyPeerEnabled() ? 1L : 0L);
     SET_OPTION(CURLOPT_SSL_VERIFYHOST, _settings.verifyHostEnabled() ? 2L : 0L);
   }
@@ -613,43 +669,55 @@ void MediaCurl::setupEasy()
     }
   }
 
-  if ( _settings.proxyEnabled() )
+  if ( _settings.proxyEnabled() && ! _settings.proxy().empty() )
   {
-    if ( ! _settings.proxy().empty() )
+    DBG << "Proxy: '" << _settings.proxy() << "'" << endl;
+    SET_OPTION(CURLOPT_PROXY, _settings.proxy().c_str());
+    SET_OPTION(CURLOPT_PROXYAUTH, CURLAUTH_BASIC|CURLAUTH_DIGEST|CURLAUTH_NTLM );
+    /*---------------------------------------------------------------*
+     *    CURLOPT_PROXYUSERPWD: [user name]:[password]
+     *
+     * Url::option(proxyuser and proxypassword) -> CURLOPT_PROXYUSERPWD
+     *  If not provided, $HOME/.curlrc is evaluated
+     *---------------------------------------------------------------*/
+
+    string proxyuserpwd = _settings.proxyUserPassword();
+
+    if ( proxyuserpwd.empty() )
     {
-      SET_OPTION(CURLOPT_PROXY, _settings.proxy().c_str());
-      /*---------------------------------------------------------------*
-        CURLOPT_PROXYUSERPWD: [user name]:[password]
-
-        Url::option(proxyuser and proxypassword) -> CURLOPT_PROXYUSERPWD
-        If not provided, $HOME/.curlrc is evaluated
-        *---------------------------------------------------------------*/
-
-      string proxyuserpwd = _settings.proxyUserPassword();
-
-      if ( proxyuserpwd.empty() )
+      CurlConfig curlconf;
+      CurlConfig::parseConfig(curlconf); // parse ~/.curlrc
+      if ( curlconf.proxyuserpwd.empty() )
+	DBG << "Proxy: ~/.curlrc does not contain the proxy-user option" << endl;
+      else
       {
-        CurlConfig curlconf;
-        CurlConfig::parseConfig(curlconf); // parse ~/.curlrc
-        if (curlconf.proxyuserpwd.empty())
-          DBG << "~/.curlrc does not contain the proxy-user option" << endl;
-        else
-        {
-          proxyuserpwd = curlconf.proxyuserpwd;
-          DBG << "using proxy-user from ~/.curlrc" << endl;
-        }
+	proxyuserpwd = curlconf.proxyuserpwd;
+	DBG << "Proxy: using proxy-user from ~/.curlrc" << endl;
       }
+    }
+    else
+    {
+      DBG << "Proxy: using provided proxy-user '" << _settings.proxyUsername() << "'" << endl;
+    }
 
-      proxyuserpwd = unEscape( proxyuserpwd );
-      if ( ! proxyuserpwd.empty() )
-        SET_OPTION(CURLOPT_PROXYUSERPWD, proxyuserpwd.c_str());
+    if ( ! proxyuserpwd.empty() )
+    {
+      SET_OPTION(CURLOPT_PROXYUSERPWD, unEscape( proxyuserpwd ).c_str());
     }
   }
+#if CURLVERSION_AT_LEAST(7,19,4)
+  else if ( _settings.proxy() == EXPLICITLY_NO_PROXY )
+  {
+    // Explicitly disabled in URL (see fillSettingsFromUrl()).
+    // This should also prevent libcurl from looking into the environment.
+    DBG << "Proxy: explicitly NOPROXY" << endl;
+    SET_OPTION(CURLOPT_NOPROXY, "*");
+  }
+#endif
   else
   {
-#if LIBCURL_VERSION_NUMBER >= 0x071904
-      SET_OPTION(CURLOPT_NOPROXY, "*");
-#endif
+    DBG << "Proxy: not explicitly set" << endl;
+    DBG << "Proxy: libcurl may look into the environment" << endl;
   }
 
   /** Speed limits */
@@ -657,10 +725,10 @@ void MediaCurl::setupEasy()
   {
       SET_OPTION(CURLOPT_LOW_SPEED_LIMIT, _settings.minDownloadSpeed());
       // default to 10 seconds at low speed
-      SET_OPTION(CURLOPT_LOW_SPEED_TIME, 10L);
+      SET_OPTION(CURLOPT_LOW_SPEED_TIME, 60L);
   }
 
-#if LIBCURL_VERSION_NUMBER >= 0x071505
+#if CURLVERSION_AT_LEAST(7,15,5)
   if ( _settings.maxDownloadSpeed() != 0 )
       SET_OPTION_OFFT(CURLOPT_MAX_RECV_SPEED_LARGE, _settings.maxDownloadSpeed());
 #endif
@@ -677,7 +745,7 @@ void MediaCurl::setupEasy()
   SET_OPTION(CURLOPT_PROGRESSFUNCTION, &progressCallback );
   SET_OPTION(CURLOPT_NOPROGRESS, 0L);
 
-#if LIBCURL_VERSION_NUMBER >= 0x071800
+#if CURLVERSION_AT_LEAST(7,18,0)
   // bnc #306272
     SET_OPTION(CURLOPT_PROXY_TRANSFER_MODE, 1L );
 #endif
@@ -686,7 +754,7 @@ void MediaCurl::setupEasy()
         it != vol_settings.headersEnd();
         ++it )
   {
-      MIL << "HEADER " << *it << std::endl;
+    // MIL << "HEADER " << *it << std::endl;
 
       _customHeaders = curl_slist_append(_customHeaders, it->c_str());
       if ( !_customHeaders )
@@ -768,31 +836,29 @@ void MediaCurl::releaseFrom( const std::string & ejectDev )
   disconnect();
 }
 
-Url MediaCurl::getFileUrl(const Pathname & filename) const
+Url MediaCurl::getFileUrl( const Pathname & filename_r ) const
 {
-  Url newurl(_url);
-  string path = _url.getPathName();
-  if ( !path.empty() && path != "/" && *path.rbegin() == '/' &&
-       filename.absolute() )
+  std::string path( _url.getPathName() );
+  // Simply extend the URLs pathname. An 'absolute' URL path
+  // is achieved by encoding the 2nd '/' in the URL:
+  //   URL: ftp://user@server	-> ~user
+  //   URL: ftp://user@server/	-> ~user
+  //   URL: ftp://user@server//	-> /
+  //                         ^- this '/' is just a separator
+  if ( path.empty() ||  path == "/" )	// empty URL path; the '/' is just a separator
   {
-    // If url has a path with trailing slash, remove the leading slash from
-    // the absolute file name
-    path += filename.asString().substr( 1, filename.asString().size() - 1 );
+    path = filename_r.absolutename().asString();
   }
-  else if ( filename.relative() )
+  else if ( *path.rbegin() == '/' )
   {
-    // Add trailing slash to path, if not already there
-    if (path.empty()) path = "/";
-    else if (*path.rbegin() != '/' ) path += "/";
-    // Remove "./" from begin of relative file name
-    path += filename.asString().substr( 2, filename.asString().size() - 2 );
+    path += filename_r.absolutename().asString().substr(1);
   }
   else
   {
-    path += filename.asString();
+    path += filename_r.absolutename().asString();
   }
-
-  newurl.setPathName(path);
+  Url newurl( _url );
+  newurl.setPathName( path );
   return newurl;
 }
 
@@ -954,10 +1020,11 @@ void MediaCurl::evaluateCurlCode( const Pathname &filename,
       }
       break;
       case CURLE_FTP_COULDNT_RETR_FILE:
-#if LIBCURL_VERSION_NUMBER >= 0x071600
+#if CURLVERSION_AT_LEAST(7,16,0)
       case CURLE_REMOTE_FILE_NOT_FOUND:
 #endif
       case CURLE_FTP_ACCESS_DENIED:
+      case CURLE_TFTP_NOTFOUND:
         err = "File not found";
         ZYPP_THROW(MediaFileNotFoundException(_url, filename));
         break;
@@ -975,9 +1042,11 @@ void MediaCurl::evaluateCurlCode( const Pathname &filename,
         err = "Write error";
         break;
       case CURLE_PARTIAL_FILE:
-      case CURLE_ABORTED_BY_CALLBACK:
       case CURLE_OPERATION_TIMEDOUT:
-        if( timeout_reached)
+	timeout_reached	= true; // fall though to TimeoutException
+	// fall though...
+      case CURLE_ABORTED_BY_CALLBACK:
+         if( timeout_reached )
         {
           err  = "Timeout reached";
           ZYPP_THROW(MediaTimeoutException(url));
@@ -1217,7 +1286,7 @@ void MediaCurl::doGetFileCopy( const Pathname & filename , const Pathname & targ
       ZYPP_THROW(MediaSystemException(url, "out of memory for temp file name"));
     }
 
-    int tmp_fd = ::mkstemp( buf );
+    int tmp_fd = ::mkostemp( buf, O_CLOEXEC );
     if( tmp_fd == -1)
     {
       free( buf);
@@ -1227,7 +1296,7 @@ void MediaCurl::doGetFileCopy( const Pathname & filename , const Pathname & targ
     destNew = buf;
     free( buf);
 
-    FILE *file = ::fdopen( tmp_fd, "w" );
+    FILE *file = ::fdopen( tmp_fd, "we" );
     if ( !file ) {
       ::close( tmp_fd);
       filesystem::unlink( destNew );
@@ -1271,7 +1340,7 @@ void MediaCurl::doGetFileCopy( const Pathname & filename , const Pathname & targ
     {
       DBG << "HTTP response: " + str::numstring(httpReturnCode);
       if ( httpReturnCode == 304
-           || ( httpReturnCode == 213 && _url.getScheme() == "ftp" ) ) // not modified
+           || ( httpReturnCode == 213 && (_url.getScheme() == "ftp" || _url.getScheme() == "tftp") ) ) // not modified
       {
         DBG << " Not modified.";
         modified = false;
@@ -1353,7 +1422,7 @@ void MediaCurl::doGetFileCopyFile( const Pathname & filename , const Pathname & 
     }
 
     // Set callback and perform.
-    ProgressData progressData(_settings.timeout(), url, &report);
+    ProgressData progressData(_curl, _settings.timeout(), url, &report);
     if (!(options & OPTION_NO_REPORT_START))
       report->start(url, dest);
     if ( curl_easy_setopt( _curl, CURLOPT_PROGRESSDATA, &progressData ) != 0 ) {
@@ -1361,6 +1430,27 @@ void MediaCurl::doGetFileCopyFile( const Pathname & filename , const Pathname & 
     }
 
     ret = curl_easy_perform( _curl );
+#if CURLVERSION_AT_LEAST(7,19,4)
+    // bnc#692260: If the client sends a request with an If-Modified-Since header
+    // with a future date for the server, the server may respond 200 sending a
+    // zero size file.
+    // curl-7.19.4 introduces CURLINFO_CONDITION_UNMET to check this condition.
+    if ( ftell(file) == 0 && ret == 0 )
+    {
+      long httpReturnCode = 33;
+      if ( curl_easy_getinfo( _curl, CURLINFO_RESPONSE_CODE, &httpReturnCode ) == CURLE_OK && httpReturnCode == 200 )
+      {
+	long conditionUnmet = 33;
+	if ( curl_easy_getinfo( _curl, CURLINFO_CONDITION_UNMET, &conditionUnmet ) == CURLE_OK && conditionUnmet )
+	{
+	  WAR << "TIMECONDITION unmet - retry without." << endl;
+	  curl_easy_setopt(_curl, CURLOPT_TIMECONDITION, CURL_TIMECOND_NONE);
+	  curl_easy_setopt(_curl, CURLOPT_TIMEVALUE, 0L);
+	  ret = curl_easy_perform( _curl );
+	}
+      }
+    }
+#endif
 
     if ( curl_easy_setopt( _curl, CURLOPT_PROGRESSDATA, NULL ) != 0 ) {
       WAR << "Can't unset CURLOPT_PROGRESSDATA: " << _curlError << endl;;
@@ -1373,7 +1463,7 @@ void MediaCurl::doGetFileCopyFile( const Pathname & filename , const Pathname & 
           << " bytes." << endl;
 
       // the timeout is determined by the progress data object
-      // which holds wheter the timeout was reached or not,
+      // which holds whether the timeout was reached or not,
       // otherwise it would be a user cancel
       try {
         evaluateCurlCode( filename, ret, progressData.reached);
@@ -1450,6 +1540,11 @@ int MediaCurl::progressCallback( void *clientp,
   ProgressData *pdata = reinterpret_cast<ProgressData *>(clientp);
   if( pdata)
   {
+    // work around curl bug that gives us old data
+    long httpReturnCode = 0;
+    if (curl_easy_getinfo(pdata->curl, CURLINFO_RESPONSE_CODE, &httpReturnCode) != CURLE_OK || httpReturnCode == 0)
+      return 0;
+
     time_t now   = time(NULL);
     if( now > 0)
     {
@@ -1530,6 +1625,12 @@ int MediaCurl::progressCallback( void *clientp,
     }
   }
   return 0;
+}
+
+CURL *MediaCurl::progressCallback_getcurl( void *clientp )
+{
+  ProgressData *pdata = reinterpret_cast<ProgressData *>(clientp);
+  return pdata ? pdata->curl : 0;
 }
 
 ///////////////////////////////////////////////////////////////////

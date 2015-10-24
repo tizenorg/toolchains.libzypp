@@ -31,7 +31,8 @@ namespace zypp {
      * repesentation.
      *
      * When the last reference drops any file or directory located at the path
-     * passed to the ctor is deleted (recursivly in case of directories).
+     * passed to the ctor is deleted (recursivly in case of directories). This
+     * behavior can be canged by calling \ref autoCleanup.
      *
      * Principally serves as base class, but standalone usable.
      **/
@@ -59,7 +60,7 @@ namespace zypp {
          * Test whether the Pathname is valid (i.e. not empty. NOT whether
          * it really denotes an existing file or directory).
          **/
-        operator const void * () const;
+        explicit operator bool() const;
 
         /**
          * @return The Pathname.
@@ -72,6 +73,16 @@ namespace zypp {
          **/
         operator Pathname() const
         { return path(); }
+
+        /**
+	 * Whether path is valid and deleted when the last reference drops.
+	 */
+        bool autoCleanup() const;
+
+        /**
+	 * Turn \ref autoCleanup on/off if path is valid.
+	 */
+	void autoCleanup( bool yesno_r );
 
       public:
         /**

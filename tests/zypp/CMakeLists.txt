@@ -9,6 +9,8 @@ ADD_TESTS(
   Arch
   Capabilities
   CheckSum
+  ContentType
+  CpeId
   Date
   Dup
   Digest
@@ -16,14 +18,17 @@ ADD_TESTS(
   Edition
   Fetcher
   FileChecker
+  Flags
   InstanceId
   KeyRing
   Locks
   MediaSetAccess
   PathInfo
+  Pathname
   PluginFrame
   PoolQuery
   ProgressData
+  PtrTypes
   PublicKey
   RWPtr
   RepoInfo
@@ -32,6 +37,8 @@ ADD_TESTS(
   ResKind
   ResStatus
   Selectable
+  SetRelationMixin
+  StrMatcher
   Target
   Url
   Vendor

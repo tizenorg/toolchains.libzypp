@@ -17,12 +17,17 @@
 #include "zypp/parser/xml/XmlEscape.h"
 
 #include "zypp/RepoInfo.h"
-#include "zypp/repo/RepoInfoBaseImpl.h"
+#include "zypp/TriBool.h"
+#include "zypp/Pathname.h"
 #include "zypp/repo/RepoMirrorList.h"
 #include "zypp/ExternalProgram.h"
 #include "zypp/media/MediaAccess.h"
 
-using namespace std;
+#include "zypp/base/IOStream.h"
+#include "zypp/base/InputStream.h"
+#include "zypp/parser/xml/Reader.h"
+
+using std::endl;
 using zypp::xml::escape;
 
 ///////////////////////////////////////////////////////////////////
@@ -34,11 +39,10 @@ namespace zypp
   //	CLASS NAME : RepoInfo::Impl
   //
   /** RepoInfo implementation. */
-  struct RepoInfo::Impl : public repo::RepoInfoBase::Impl
+  struct RepoInfo::Impl
   {
     Impl()
-      : repo::RepoInfoBase::Impl()
-      , gpgcheck(indeterminate)
+      : gpgcheck(indeterminate)
       ,	keeppackages(indeterminate)
       , type(repo::RepoType::NONE_e)
       , emptybaseurls(false)
@@ -65,14 +69,10 @@ namespace zypp
     { return metadatapath.empty() ? Pathname() : metadatapath / path / "license.tar.gz"; }
 
     Url getmirrorListUrl() const
-    {
-      return replacer(mirrorlist_url);
-    }
+    { return replacer(mirrorlist_url); }
 
     Url &setmirrorListUrl()
-    {
-      return mirrorlist_url;
-    }
+    { return mirrorlist_url; }
 
     const std::set<Url> &baseUrls() const
     {
@@ -96,26 +96,59 @@ namespace zypp
     }
 
     std::set<Url> &baseUrls()
-    {
-      return _baseUrls;
-    }
+    { return _baseUrls; }
 
     bool baseurl2dump() const
-    {
-      return !emptybaseurls && !_baseUrls.empty();
-    }
+    { return !emptybaseurls && !_baseUrls.empty(); }
 
-    /** Compute a resonable default for keepPackages based on URL scheme. */
-    bool keepPackagesDefault() const
+
+    void addContent( const std::string & keyword_r )
+    { _keywords.insert( keyword_r ); }
+
+    bool hasContent( const std::string & keyword_r ) const
     {
-      if (indeterminate(keeppackages))
+      if ( _keywords.empty() && ! metadatapath.empty() )
       {
-        if (_baseUrls.empty())
-          return mirrorlist_url.schemeIsDownloading();
-        else
-          return _baseUrls.begin()->schemeIsDownloading();
+	// HACK directly check master index file until RepoManager offers
+	// some content probing ans zypepr uses it.
+	/////////////////////////////////////////////////////////////////
+	MIL << "Empty keywords...." << metadatapath << endl;
+	Pathname master;
+	if ( PathInfo( (master=metadatapath/"/repodata/repomd.xml") ).isFile() )
+	{
+	  //MIL << "GO repomd.." << endl;
+	  xml::Reader reader( master );
+	  while ( reader.seekToNode( 2, "content" ) )
+	  {
+	    _keywords.insert( reader.nodeText().asString() );
+	    reader.seekToEndNode( 2, "content" );
+	  }
+	  _keywords.insert( "" );	// valid content in _keywords even if empty
+	}
+	else if ( PathInfo( (master=metadatapath/"/content") ).isFile() )
+	{
+	  //MIL << "GO content.." << endl;
+	  iostr::forEachLine( InputStream( master ),
+                            [this]( int num_r, std::string line_r )->bool
+                            {
+                              if ( str::startsWith( line_r, "REPOKEYWORDS" ) )
+			      {
+				std::vector<std::string> words;
+				if ( str::split( line_r, std::back_inserter(words) ) > 1
+				  && words[0].length() == 12 /*"REPOKEYWORDS"*/ )
+				{
+				  this->_keywords.insert( ++words.begin(), words.end() );
+				}
+				return true; // mult. occurrances are ok.
+			      }
+			      return( ! str::startsWith( line_r, "META " ) );	// no need to parse into META section.
+			    } );
+	  _keywords.insert( "" );
+	}
+	/////////////////////////////////////////////////////////////////
       }
-      return (bool) keeppackages;
+      return( _keywords.find( keyword_r ) != _keywords.end() );
+
     }
 
   public:
@@ -135,6 +168,7 @@ namespace zypp
   private:
     Url mirrorlist_url;
     mutable std::set<Url> _baseUrls;
+    mutable std::set<std::string> _keywords;
 
     friend Impl * rwcowClone<Impl>( const Impl * rhs );
     /** clone for RWCOW_pointer */
@@ -178,32 +212,24 @@ namespace zypp
 
   unsigned RepoInfo::priority() const
   { return _pimpl->priority; }
+
   unsigned RepoInfo::defaultPriority()
   { return Impl::defaultPriority; }
+
   void RepoInfo::setPriority( unsigned newval_r )
-  {
-    _pimpl->priority = newval_r ? newval_r : Impl::defaultPriority;
-  }
+  { _pimpl->priority = newval_r ? newval_r : Impl::defaultPriority; }
 
   void RepoInfo::setGpgCheck( bool check )
-  {
-    _pimpl->gpgcheck = check;
-  }
+  { _pimpl->gpgcheck = check; }
 
   void RepoInfo::setMirrorListUrl( const Url &url )
-  {
-    _pimpl->setmirrorListUrl() = url;
-  }
+  { _pimpl->setmirrorListUrl() = url; }
 
   void RepoInfo::setGpgKeyUrl( const Url &url )
-  {
-    _pimpl->gpgkey_url = url;
-  }
+  { _pimpl->gpgkey_url = url; }
 
   void RepoInfo::addBaseUrl( const Url &url )
-  {
-    _pimpl->baseUrls().insert(url);
-  }
+  { _pimpl->baseUrls().insert(url); }
 
   void RepoInfo::setBaseUrl( const Url &url )
   {
@@ -212,47 +238,35 @@ namespace zypp
   }
 
   void RepoInfo::setPath( const Pathname &path )
-  {
-    _pimpl->path = path;
-  }
+  { _pimpl->path = path; }
 
   void RepoInfo::setType( const repo::RepoType &t )
-  {
-    _pimpl->type = t;
-  }
+  { _pimpl->type = t; }
 
   void RepoInfo::setProbedType( const repo::RepoType &t ) const
   { _pimpl->setProbedType( t ); }
 
 
   void RepoInfo::setMetadataPath( const Pathname &path )
-  {
-    _pimpl->metadatapath = path;
-  }
+  { _pimpl->metadatapath = path; }
 
   void RepoInfo::setPackagesPath( const Pathname &path )
-  {
-    _pimpl->packagespath = path;
-  }
+  { _pimpl->packagespath = path; }
 
   void RepoInfo::setKeepPackages( bool keep )
-  {
-    _pimpl->keeppackages = keep;
-  }
+  { _pimpl->keeppackages = keep; }
 
   void RepoInfo::setService( const std::string& name )
-  {
-    _pimpl->service = name;
-  }
+  { _pimpl->service = name; }
 
-  void RepoInfo::setTargetDistribution(
-      const std::string & targetDistribution)
-  {
-    _pimpl->targetDistro = targetDistribution;
-  }
+  void RepoInfo::setTargetDistribution( const std::string & targetDistribution )
+  { _pimpl->targetDistro = targetDistribution; }
 
   bool RepoInfo::gpgCheck() const
-  { return indeterminate(_pimpl->gpgcheck) ? true : (bool) _pimpl->gpgcheck; }
+  { return indeterminate(_pimpl->gpgcheck) ? true : (bool)_pimpl->gpgcheck; }
+
+  bool RepoInfo::keepPackages() const
+  { return indeterminate(_pimpl->keeppackages) ? false : (bool)_pimpl->keeppackages; }
 
   Pathname RepoInfo::metadataPath() const
   { return _pimpl->metadatapath; }
@@ -264,9 +278,7 @@ namespace zypp
   { return _pimpl->type; }
 
   Url RepoInfo::mirrorListUrl() const
-  {
-    return _pimpl->getmirrorListUrl();
-  }
+  { return _pimpl->getmirrorListUrl(); }
 
   Url RepoInfo::gpgKeyUrl() const
   { return _pimpl->gpgkey_url; }
@@ -315,11 +327,12 @@ namespace zypp
   bool RepoInfo::baseUrlSet() const
   { return _pimpl->baseurl2dump(); }
 
-  // false by default (if not set by setKeepPackages)
-  bool RepoInfo::keepPackages() const
-  {
-    return _pimpl->keepPackagesDefault();
-  }
+
+  void RepoInfo::addContent( const std::string & keyword_r )
+  { _pimpl->addContent( keyword_r ); }
+
+  bool RepoInfo::hasContent( const std::string & keyword_r ) const
+  { return _pimpl->hasContent( keyword_r ); }
 
   ///////////////////////////////////////////////////////////////////
 
@@ -330,6 +343,34 @@ namespace zypp
     SEC << PathInfo(licenseTgz) << endl;
 
     return ! licenseTgz.empty() &&  PathInfo(licenseTgz).isFile();
+  }
+
+  bool RepoInfo::needToAcceptLicense() const
+  {
+    static const std::string noAcceptanceFile = "no-acceptance-needed\n";
+    bool accept = true;
+
+    Pathname licenseTgz( _pimpl->licenseTgz() );
+    if ( licenseTgz.empty() || ! PathInfo( licenseTgz ).isFile() )
+      return false;     // no licenses at all
+
+    ExternalProgram::Arguments cmd;
+    cmd.push_back( "tar" );
+    cmd.push_back( "-t" );
+    cmd.push_back( "-z" );
+    cmd.push_back( "-f" );
+    cmd.push_back( licenseTgz.asString() );
+
+    ExternalProgram prog( cmd, ExternalProgram::Stderr_To_Stdout );
+    for ( std::string output( prog.receiveLine() ); output.length(); output = prog.receiveLine() )
+    {
+      if ( output == noAcceptanceFile )
+      {
+        accept = false;
+      }
+    }
+    MIL << "License for " << this->name() << " has to be accepted: " << (accept?"true":"false" ) << endl;
+    return accept;
   }
 
   std::string RepoInfo::getLicense( const Locale & lang_r )
@@ -400,10 +441,6 @@ namespace zypp
         else
           ret.insert( Locale( std::string( output.c_str()+license.size(), output.size()- license.size() - dotTxt.size() ) ) );
       }
-      else
-      {
-        WAR << "  " << output;
-      }
     }
     prog.close();
     return ret;
@@ -423,30 +460,27 @@ namespace zypp
         str << "- url         : " << *it << std::endl;
       }
     }
-    if ( ! (_pimpl->getmirrorListUrl().asString().empty())  )
-    {
-      str << "- mirrorlist  : " << _pimpl->getmirrorListUrl() << std::endl;
-    }
-    str << "- path        : " << path() << std::endl;
+
+    // print if non empty value
+    auto strif( [&] ( const std::string & tag_r, const std::string & value_r ) {
+      if ( ! value_r.empty() )
+	str << tag_r << value_r << std::endl;
+    });
+
+    strif( "- mirrorlist  : ", _pimpl->getmirrorListUrl().asString() );
+    strif( "- path        : ", path().asString() );
     str << "- type        : " << type() << std::endl;
     str << "- priority    : " << priority() << std::endl;
-
     str << "- gpgcheck    : " << gpgCheck() << std::endl;
-    str << "- gpgkey      : " << gpgKeyUrl() << std::endl;
+    strif( "- gpgkey      : ", gpgKeyUrl().asString() );
 
-    if (!indeterminate(_pimpl->keeppackages))
+    if ( ! indeterminate(_pimpl->keeppackages) )
       str << "- keeppackages: " << keepPackages() << std::endl;
 
-    str << "- service     : " << service() << std::endl;
-
-    if (!targetDistribution().empty())
-      str << "- targetdistro: " << targetDistribution() << std::endl;
-
-    if (!metadataPath().empty())
-      str << "- metadataPath: " << metadataPath() << std::endl;
-
-    if (!packagesPath().empty())
-      str << "- packagesPath: " << packagesPath() << std::endl;
+    strif( "- service     : ", service() );
+    strif( "- targetdistro: ", targetDistribution() );
+    strif( "- metadataPath: ", metadataPath().asString() );
+    strif( "- packagesPath: ", packagesPath().asString() );
 
     return str;
   }
@@ -491,12 +525,9 @@ namespace zypp
     return str;
   }
 
-  std::ostream & RepoInfo::dumpAsXMLOn( std::ostream & str) const
-  { return dumpAsXMLOn(str, ""); }
-
-  std::ostream & RepoInfo::dumpAsXMLOn( std::ostream & str, const std::string & content) const
+  std::ostream & RepoInfo::dumpAsXmlOn( std::ostream & str, const std::string & content ) const
   {
-    string tmpstr;
+    std::string tmpstr;
     str
       << "<repo"
       << " alias=\"" << escape(alias()) << "\""
@@ -504,6 +535,7 @@ namespace zypp
     if (type() != repo::RepoType::NONE)
       str << " type=\"" << type().asString() << "\"";
     str
+      << " priority=\"" << priority() << "\""
       << " enabled=\"" << enabled() << "\""
       << " autorefresh=\"" << autorefresh() << "\""
       << " gpgcheck=\"" << gpgCheck() << "\"";

@@ -231,9 +231,7 @@ namespace zypp
       static inline MountEntries
       getMountEntries()
       {
-        // use "/etc/mtab" by default,
-        // fallback to "/proc/mounts"
-        return Mount::getEntries(/* "/etc/mtab" */);
+        return Mount::getEntries();
       }
 
     };
@@ -241,7 +239,7 @@ namespace zypp
 
     //////////////////////////////////////////////////////////////////
     // STATIC
-    zypp::RW_pointer<MediaManager_Impl> MediaManager::m_impl(NULL);
+    zypp::RW_pointer<MediaManager_Impl> MediaManager::m_impl;
 
 
     //////////////////////////////////////////////////////////////////

@@ -19,7 +19,7 @@
 
 #include "zypp/sat/Pool.h"
 #include "zypp/sat/LookupAttr.h"
-#include "zypp/sat/AttrMatcher.h"
+#include "zypp/base/StrMatcher.h"
 
 #include "zypp/CheckSum.h"
 
@@ -80,13 +80,13 @@ namespace zypp
             _parent = p;
         }
 
-        const AttrMatcher & attrMatcher() const
-        { return _attrMatcher; }
+        const StrMatcher & strMatcher() const
+        { return _strMatcher; }
 
-        void setAttrMatcher( const AttrMatcher & matcher_r )
+        void setStrMatcher( const StrMatcher & matcher_r )
         {
           matcher_r.compile();
-          _attrMatcher = matcher_r;
+          _strMatcher = matcher_r;
         }
 
       public:
@@ -135,7 +135,7 @@ namespace zypp
           else if ( _repo )
             whichRepo = _repo.id();
 
-          detail::DIWrap dip( whichRepo, _solv.id(), _attr.id(), _attrMatcher.searchstring(), _attrMatcher.flags().get() );
+          detail::DIWrap dip( whichRepo, _solv.id(), _attr.id(), _strMatcher.searchstring(), _strMatcher.flags().get() );
           if ( _parent != SolvAttr::noAttr )
             ::dataiterator_prepend_keyname( dip.get(), _parent.id() );
 
@@ -150,7 +150,7 @@ namespace zypp
         SolvAttr   _parent;
         Repository _repo;
         Solvable   _solv;
-        AttrMatcher _attrMatcher;
+        StrMatcher _strMatcher;
 
       private:
         friend Impl * rwcowClone<Impl>( const Impl * rhs );
@@ -199,11 +199,11 @@ namespace zypp
     void LookupAttr::setAttr( SolvAttr attr_r )
     { _pimpl->setAttr( attr_r ); }
 
-    const AttrMatcher & LookupAttr::attrMatcher() const
-    { return _pimpl->attrMatcher(); }
+    const StrMatcher & LookupAttr::strMatcher() const
+    { return _pimpl->strMatcher(); }
 
-    void LookupAttr::setAttrMatcher( const AttrMatcher & matcher_r )
-    { _pimpl->setAttrMatcher( matcher_r ); }
+    void LookupAttr::setStrMatcher( const StrMatcher & matcher_r )
+    { _pimpl->setStrMatcher( matcher_r ); }
 
     ///////////////////////////////////////////////////////////////////
 
@@ -321,6 +321,7 @@ namespace zypp
         {
           _dip = new ::Dataiterator;
           ::dataiterator_init_clone( _dip, rhs._dip );
+	  ::dataiterator_strdup( _dip );
         }
       }
 
@@ -559,6 +560,22 @@ namespace zypp
     unsigned LookupAttr::iterator::asUnsigned() const
     { return asInt(); }
 
+    unsigned long long LookupAttr::iterator::asUnsignedLL() const
+    {
+      if ( _dip )
+      {
+        switch ( solvAttrType() )
+        {
+          case REPOKEY_TYPE_U32:
+          case REPOKEY_TYPE_NUM:
+          case REPOKEY_TYPE_CONSTANT:
+            return SOLV_KV_NUM64(&_dip->kv);
+            break;
+        }
+      }
+      return 0;
+    }
+
     bool LookupAttr::iterator::asBool() const
     { return asInt(); }
 
@@ -583,7 +600,10 @@ namespace zypp
             break;
 
           case REPOKEY_TYPE_DIRSTRARRAY:
-            return ::repodata_dir2str( _dip->data, _dip->kv.id, _dip->kv.str );
+	    // may or may not be stringified depending on SEARCH_FILES flag
+            return( _dip->flags & SEARCH_FILES
+		    ? _dip->kv.str
+		    : ::repodata_dir2str( _dip->data, _dip->kv.id, _dip->kv.str ) );
             break;
         }
       }
@@ -736,10 +756,17 @@ namespace zypp
 
     void LookupAttr::iterator::increment()
     {
-      if ( _dip && ! ::dataiterator_step( _dip.get() ) )
+      if ( _dip )
       {
-        _dip.reset();
-        base_reference() = 0;
+	if ( ! ::dataiterator_step( _dip.get() ) )
+	{
+	  _dip.reset();
+	  base_reference() = 0;
+	}
+	else
+	{
+	  ::dataiterator_strdup( _dip.get() );
+	}
       }
     }
 

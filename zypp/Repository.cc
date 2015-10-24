@@ -15,6 +15,7 @@
 #include "zypp/base/Logger.h"
 #include "zypp/base/Gettext.h"
 #include "zypp/base/Exception.h"
+#include "zypp/base/Xml.h"
 
 #include "zypp/AutoDispose.h"
 #include "zypp/Pathname.h"
@@ -64,6 +65,9 @@ namespace zypp
     std::string Repository::name() const
     { return info().name(); }
 
+    std::string Repository::label() const
+    { return info().label(); }
+
     int Repository::satInternalPriority() const
     {
       NO_REPOSITORY_RETURN( INT_MIN );
@@ -76,6 +80,29 @@ namespace zypp
       return _repo->subpriority;
     }
 
+    Repository::ContentRevision Repository::contentRevision() const
+    {
+      NO_REPOSITORY_RETURN( ContentRevision() );
+      sat::LookupRepoAttr q( sat::SolvAttr::repositoryRevision, *this );
+      return q.empty() ? std::string() : q.begin().asString();
+    }
+
+    Repository::ContentIdentifier Repository::contentIdentifier() const
+    {
+      NO_REPOSITORY_RETURN( ContentIdentifier() );
+      sat::LookupRepoAttr q( sat::SolvAttr::repositoryRepoid, *this );
+      return q.empty() ? std::string() : q.begin().asString();
+    }
+
+    bool Repository::hasContentIdentifier( const ContentIdentifier & id_r ) const
+    {
+      NO_REPOSITORY_RETURN( false );
+      sat::LookupRepoAttr q( sat::SolvAttr::repositoryRepoid, *this );
+      for_( it, q.begin(), q.end() )
+	if ( it.asString() == id_r )
+	  return true;
+      return false;
+    }
 
     zypp::Date Repository::generatedTimestamp() const
     {
@@ -95,13 +122,21 @@ namespace zypp
       if ( q.empty() )
         return 0;
 
-      return generated + q.begin().asUnsigned();
+      return generated + Date(q.begin().asUnsigned());
     }
 
     Repository::Keywords Repository::keywords() const
     {
       NO_REPOSITORY_RETURN( Keywords() );
       return Keywords( sat::SolvAttr::repositoryKeywords, *this, sat::LookupAttr::REPO_ATTR );
+    }
+
+    bool Repository::hasKeyword( const std::string & val_r ) const
+    {
+      for ( const auto & val : keywords() )
+	if ( val == val_r )
+	  return true;
+      return false;
     }
 
     bool Repository::maybeOutdated() const
@@ -120,20 +155,14 @@ namespace zypp
       return suggestedExpirationTimestamp() < Date::now();
     }
 
-    bool Repository::providesUpdatesFor( const std::string &key ) const
+    bool Repository::providesUpdatesFor( const CpeId & cpeid_r ) const
     {
       NO_REPOSITORY_RETURN( false );
-
-      for_( it,
-            updatesProductBegin(),
-            updatesProductEnd() )
+      for_( it, updatesProductBegin(), updatesProductEnd() )
       {
-        // FIXME implement real CPE matching here
-        // someday
-        if ( key == it.cpeId() )
-          return true;
+	if ( compare( cpeid_r, it.cpeId(), SetRelation::subset ) )
+	  return true;
       }
-
       return false;
     }
 
@@ -248,7 +277,7 @@ namespace zypp
     {
       NO_REPOSITORY_THROW( Exception( "Can't add solvables to norepo." ) );
 
-      AutoDispose<FILE*> file( ::fopen( file_r.c_str(), "r" ), ::fclose );
+      AutoDispose<FILE*> file( ::fopen( file_r.c_str(), "re" ), ::fclose );
       if ( file == NULL )
       {
         file.resetDispose();
@@ -270,7 +299,7 @@ namespace zypp
       std::string command( file_r.extension() == ".gz" ? "zcat " : "cat " );
       command += file_r.asString();
 
-      AutoDispose<FILE*> file( ::popen( command.c_str(), "r" ), ::pclose );
+      AutoDispose<FILE*> file( ::popen( command.c_str(), "re" ), ::pclose );
       if ( file == NULL )
       {
         file.resetDispose();
@@ -308,6 +337,30 @@ namespace zypp
 		   << "}";
     }
 
+    std::ostream & dumpAsXmlOn( std::ostream & str, const Repository & obj )
+    {
+      return xmlout::node( str, "repository", {
+	{ "name", obj.name() },
+	{ "alias", obj.alias() }
+      } );
+    }
+
+    //////////////////////////////////////////////////////////////////
+    namespace detail
+    {
+      void RepositoryIterator::increment()
+      {
+	if ( base() )
+	{
+	  ::_Pool * satpool = sat::Pool::instance().get();
+	  do {
+	    ++base_reference();
+	  } while ( base() < satpool->repos+satpool->nrepos && !*base() );
+	}
+      }
+    } // namespace detail
+    //////////////////////////////////////////////////////////////////
+
     ///////////////////////////////////////////////////////////////////
     //
     // Repository::ProductInfoIterator
@@ -320,8 +373,8 @@ namespace zypp
     std::string Repository::ProductInfoIterator::label() const
     { return base_reference().subFind( sat::SolvAttr::repositoryProductLabel ).asString(); }
 
-    std::string Repository::ProductInfoIterator::cpeId() const
-    { return base_reference().subFind( sat::SolvAttr::repositoryProductCpeid ).asString(); }
+    CpeId Repository::ProductInfoIterator::cpeId() const
+    { return CpeId( base_reference().subFind( sat::SolvAttr::repositoryProductCpeid ).asString(), CpeId::noThrow ); }
 
     /////////////////////////////////////////////////////////////////
 } // namespace zypp

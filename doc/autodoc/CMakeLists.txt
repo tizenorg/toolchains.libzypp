@@ -1,4 +1,6 @@
 ### ##################################################
+IF ( DOXYGEN )
+### ##################################################
 
 FIND_PROGRAM( DOT dot )
 IF ( NOT DOT )
@@ -9,7 +11,6 @@ ELSE ( NOT DOT )
 ENDIF ( NOT DOT )
 
 SET( ZYPP_SOURCE_DIR     ${LIBZYPP_SOURCE_DIR}/zypp )
-SET( ZYPP_TESTUTILS_DIR     ${LIBZYPP_SOURCE_DIR}/test/lib )
 SET( ZYPP_DOCINCLUDE_DIR ${LIBZYPP_SOURCE_DIR}/doc/autoinclude )
 SET( ZYPP_EXAMPLE_DIR    ${LIBZYPP_SOURCE_DIR}/examples )
 
@@ -30,7 +31,7 @@ CONFIGURE_FILE(
 ADD_CUSTOM_COMMAND (
    OUTPUT  ${DOXYGEN_OUTPUT}
    COMMAND ${CMAKE_COMMAND} -E echo_append "Building Documentation..."
-   COMMAND ${DOXYGEN} ${DOXYGEN_INPUT}
+   COMMAND ${DOXYGEN} ${DOXYGEN_INPUT} || { echo '*** IGNORE FAILED DOXYGEN - DOC MIGHT BE INCOMPLETE!'\; true\; }
    COMMAND ${CMAKE_COMMAND} -E echo "Done."
    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
    DEPENDS ${DOXYGEN_INPUT}
@@ -39,11 +40,10 @@ ADD_CUSTOM_COMMAND (
 ADD_CUSTOM_TARGET( doc ALL
    DEPENDS ${DOXYGEN_OUTPUT}
 )
-ADD_DEPENDENCIES(doc zypp)
 
 ADD_CUSTOM_TARGET( doc_forced
    COMMAND ${CMAKE_COMMAND} -E echo_append "Building Documentation..."
-   COMMAND ${DOXYGEN} ${DOXYGEN_INPUT}
+   COMMAND ${DOXYGEN} ${DOXYGEN_INPUT} || { echo '*** IGNORE FAILED DOXYGEN - DOC MIGHT BE INCOMPLETE!'\; true\; }
    COMMAND ${CMAKE_COMMAND} -E echo "Done."
    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
    DEPENDS ${DOXYGEN_INPUT}
@@ -67,4 +67,7 @@ INSTALL( FILES
 #   ${CMAKE_CURRENT_BINARY_DIR}/html
 #   DESTINATION ${DOC_INSTALL_DIR}
 #)
+### ##################################################
+ENDIF ( DOXYGEN )
+### ##################################################
 

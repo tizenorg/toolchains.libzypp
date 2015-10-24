@@ -12,14 +12,18 @@
 #ifndef   ZYPP_URL_H
 #define   ZYPP_URL_H
 
-#include <zypp/url/UrlBase.h>
-#include <zypp/url/UrlUtils.h>
+#include "zypp/url/UrlBase.h"
+#include "zypp/url/UrlUtils.h"
 
 
 //////////////////////////////////////////////////////////////////////
 namespace zypp
 { ////////////////////////////////////////////////////////////////////
 
+  namespace filesystem {
+    class Pathname;
+  }
+  using filesystem::Pathname;
 
   /**
    * \class Url
@@ -252,7 +256,7 @@ namespace zypp
     /** \overload nonstatic version */
     bool schemeIsLocal() const { return schemeIsLocal( getScheme() ); }
 
-    /** nfs nfs4 smb cifs http https ftp sftp */
+    /** nfs nfs4 smb cifs http https ftp sftp tftp */
     static bool schemeIsRemote( const std::string & scheme_r );
     /** \overload nonstatic version */
     bool schemeIsRemote() const { return schemeIsRemote( getScheme() ); }
@@ -262,7 +266,7 @@ namespace zypp
     /** \overload nonstatic version */
     bool schemeIsVolatile() const { return schemeIsVolatile( getScheme() ); }
 
-    /** http https ftp sftp */
+    /** http https ftp sftp tftp */
     static bool schemeIsDownloading( const std::string & scheme_r );
     /** \overload nonstatic version */
     bool schemeIsDownloading() const { return schemeIsDownloading( getScheme() ); }
@@ -673,6 +677,14 @@ namespace zypp
      */
     void
     setPathName(const std::string &path,
+                EEncoding         eflag = zypp::url::E_DECODED);
+    /** \overload */
+    void
+    setPathName(const Pathname &path,
+                EEncoding         eflag = zypp::url::E_DECODED);
+    /** \overload */
+    void
+    setPathName(const char *path,
                 EEncoding         eflag = zypp::url::E_DECODED);
 
     /**

@@ -26,7 +26,7 @@ namespace zypp
     /** Those are denoted to be installed, if the
      *  solver verifies them as being satisfied. */
     inline bool isPseudoInstalled( ResKind kind_r )
-    { return( kind_r == ResKind::patch || kind_r == ResKind::pattern ); }
+    { return( kind_r == ResKind::patch ); }
 
     /////////////////////////////////////////////////////////////////
   } // namespace traits
@@ -38,7 +38,7 @@ namespace zypp
    * Forward declaration of all Resolvable smart pointer
    * types provided in \c ResTraits.h (recommended in header files):
    * \code
-   * #include<zypp/ResTraits.h>
+   * #include "zypp/ResTraits.h"
    *
    * Resolvable_Ptr                      // Resolvable *
    * ResTraits<Resolvable>::PtrType      // same as above
@@ -49,7 +49,7 @@ namespace zypp
    *
    * Synonym, but requires \c Resolvable.h being included:
    * \code
-   * #include<zypp/Resolvable.h>
+   * #include "zypp/Resolvable.h"
    *
    * Resolvable::Ptr        // same as Resolvable_Ptr but requires Resolvable.h
    * Resolvable::constPtr   // same as Resolvable_constPtr but requires Resolvable.h
@@ -57,6 +57,7 @@ namespace zypp
    *
    * \note When adding a \c NewResolvable type here, dont forgett to
    * put <tt>IMPL_PTR_TYPE(NewResolvable);</tt> into the \c NewResolvable.cc.
+   * Also check class \ref ResKind, ResKind.cc, ResObject.cc(makeResObject)
    */
   //@{
   DEFINE_PTR_TYPE( Resolvable );
@@ -67,6 +68,7 @@ namespace zypp
   DEFINE_PTR_TYPE( Pattern );
   DEFINE_PTR_TYPE( Product );
   DEFINE_PTR_TYPE( Patch );
+  DEFINE_PTR_TYPE( Application );
   //@}
 
   /** Frequently associated. */
@@ -80,7 +82,7 @@ namespace zypp
       typedef intrusive_ptr<_Res>       PtrType;
       typedef intrusive_ptr<const _Res> constPtrType;
 
-      static const ResKind              kind;
+      static const ResKind              kind;	///< Defined in ResKind.cc
 
       /** Those are denoted to be installed, if the
        *  solver verifies them as being satisfied. */

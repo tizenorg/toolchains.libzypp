@@ -19,182 +19,132 @@
 
 #include "zypp/parser/HistoryLogReader.h"
 
-using namespace std;
+using std::endl;
 
 ///////////////////////////////////////////////////////////////////
 namespace zypp
-{ /////////////////////////////////////////////////////////////////
+{
   ///////////////////////////////////////////////////////////////////
   namespace parser
-  { /////////////////////////////////////////////////////////////////
-
+  {
 
   /////////////////////////////////////////////////////////////////////
   //
-  // CLASS NAME: HistoryLogReader::Impl
+  //	class HistoryLogReader::Impl
   //
   /////////////////////////////////////////////////////////////////////
-
   struct HistoryLogReader::Impl
   {
-    Impl( const Pathname & historyFile, const ProcessItem & callback );
-    ~Impl()
+    Impl( const Pathname & historyFile_r, const Options & options_r, const ProcessData & callback_r )
+    :  _filename( historyFile_r )
+    , _options( options_r )
+    , _callback( callback_r )
     {}
 
-    HistoryItem::Ptr createHistoryItem(HistoryItem::FieldVector & fields);
-    void parseLine(const string & line, unsigned int lineNr);
+    bool parseLine( const std::string & line_r, unsigned int lineNr_r );
 
-    void readAll(const ProgressData::ReceiverFnc & progress);
-    void readFrom(const Date & date,
-        const ProgressData::ReceiverFnc & progress);
-    void readFromTo(
-        const Date & fromDate, const Date & toDate,
-        const ProgressData::ReceiverFnc & progress);
+    void readAll( const ProgressData::ReceiverFnc & progress_r );
+    void readFrom( const Date & date_r, const ProgressData::ReceiverFnc & progress_r );
+    void readFromTo( const Date & fromDate_r, const Date & toDate_r, const ProgressData::ReceiverFnc & progress_r );
 
     Pathname _filename;
-    ProcessItem _callback;
-    bool _ignoreInvalid;
+    Options  _options;
+    ProcessData _callback;
   };
 
-  HistoryLogReader::Impl::Impl( const Pathname & historyFile,
-                                const ProcessItem & callback )
-    : _filename(historyFile), _callback(callback), _ignoreInvalid(false)
-  {}
-
-  HistoryItem::Ptr
-  HistoryLogReader::Impl::createHistoryItem(HistoryItem::FieldVector & fields)
+  bool HistoryLogReader::Impl::parseLine( const std::string & line_r, unsigned lineNr_r )
   {
-    HistoryActionID aid(str::trim(fields[1]));
-    switch (aid.toEnum())
-    {
-    case HistoryActionID::INSTALL_e:
-        return HistoryItemInstall::Ptr(new HistoryItemInstall(fields));
-      break;
-
-    case HistoryActionID::REMOVE_e:
-      return HistoryItemRemove::Ptr(new HistoryItemRemove(fields));
-      break;
-
-    case HistoryActionID::REPO_ADD_e:
-      return HistoryItemRepoAdd::Ptr(new HistoryItemRepoAdd(fields));
-      break;
-
-    case HistoryActionID::REPO_REMOVE_e:
-      return HistoryItemRepoRemove::Ptr(new HistoryItemRepoRemove(fields));
-      break;
-
-    case HistoryActionID::REPO_CHANGE_ALIAS_e:
-      return HistoryItemRepoAliasChange::Ptr(new HistoryItemRepoAliasChange(fields));
-      break;
-
-    case HistoryActionID::REPO_CHANGE_URL_e:
-      return HistoryItemRepoUrlChange::Ptr(new HistoryItemRepoUrlChange(fields));
-      break;
-
-    default:
-      WAR << "Unknown history log action type: " << fields[1] << endl;
-    }
-
-    return HistoryItem::Ptr();
-  }
-
-  void HistoryLogReader::Impl::parseLine(const string & line, unsigned int lineNr)
-  {
-    HistoryItem::FieldVector fields;
-    HistoryItem::Ptr item_ptr;
-
     // parse into fields
-    str::splitEscaped(line, back_inserter(fields), "|", true);
+    HistoryLogData::FieldVector fields;
+    str::splitEscaped( line_r, std::back_inserter(fields), "|", true );
+    if ( fields.size() >= 2 )
+      str::trim( fields[1] );	// for whatever reason writer is padding the action field
 
-    if (fields.size() <= 2)
-    {
-      ParseException
-        e(str::form("Error in history log on line #%u.", lineNr));
-      e.addHistory(
-          str::form("Bad number of fields. Got %zd, expected more than %d.",
-              fields.size(), 2));
-      ZYPP_THROW(e);
-    }
-
+    // move into data class
+    HistoryLogData::Ptr data;
     try
     {
-      item_ptr = createHistoryItem(fields);
+      data = HistoryLogData::create( fields );
     }
-    catch (const Exception & e)
+    catch ( const Exception & excpt )
     {
-      ZYPP_CAUGHT(e);
-      ERR << "Invalid history log entry on line #" << lineNr << ":" << endl
-          << line << endl;
-
-      if (!_ignoreInvalid)
+      ZYPP_CAUGHT( excpt );
+      if ( _options.testFlag( IGNORE_INVALID_ITEMS ) )
       {
-        ParseException newe(
-            str::form("Error in history log on line #%u.", lineNr ) );
-        newe.remember(e);
-        ZYPP_THROW(newe);
+	WAR << "Ignore invalid history log entry on line #" << lineNr_r << " '"<< line_r << "'" << endl;
+	return true;
+      }
+      else
+      {
+	ERR << "Invalid history log entry on line #" << lineNr_r << " '"<< line_r << "'" << endl;
+	ParseException newexcpt( str::Str() << "Error in history log on line #" << lineNr_r );
+	newexcpt.remember( excpt );
+	ZYPP_THROW( newexcpt );
       }
     }
 
-    if (item_ptr)
-      _callback(item_ptr);
-    else if (!_ignoreInvalid)
+    // consume data
+    if ( _callback && !_callback( data ) )
     {
-      ParseException
-        e(str::form("Error in history log on line #%u.", lineNr));
-      e.addHistory("Unknown entry type.");
-      ZYPP_THROW(e);
+      WAR << "Stop parsing requested by consumer callback on line #" << lineNr_r << endl;
+      return false;
     }
+    return true;
   }
 
-  void HistoryLogReader::Impl::readAll(const ProgressData::ReceiverFnc & progress)
+  void HistoryLogReader::Impl::readAll( const ProgressData::ReceiverFnc & progress_r )
   {
-    InputStream is(_filename);
-    iostr::EachLine line(is);
+    InputStream is( _filename );
+    iostr::EachLine line( is );
 
     ProgressData pd;
-    pd.sendTo( progress );
+    pd.sendTo( progress_r );
     pd.toMin();
 
-    for (; line; line.next(), pd.tick() )
+    for ( ; line; line.next(), pd.tick() )
     {
       // ignore comments
-      if ((*line)[0] == '#')
+      if ( (*line)[0] == '#' )
         continue;
 
-      parseLine(*line, line.lineNo());
+      if ( ! parseLine( *line, line.lineNo() ) )
+	break;	// requested by consumer callback
     }
 
     pd.toMax();
   }
 
-  void HistoryLogReader::Impl::readFrom(const Date & date,
-      const ProgressData::ReceiverFnc & progress)
+  void HistoryLogReader::Impl::readFrom( const Date & date_r, const ProgressData::ReceiverFnc & progress_r )
   {
-    InputStream is(_filename);
-    iostr::EachLine line(is);
+    InputStream is( _filename );
+    iostr::EachLine line( is );
 
     ProgressData pd;
-    pd.sendTo( progress );
+    pd.sendTo( progress_r );
     pd.toMin();
 
     bool pastDate = false;
-    for (; line; line.next(), pd.tick())
+    for ( ; line; line.next(), pd.tick() )
     {
-      const string & s = *line;
+      const std::string & s = *line;
 
       // ignore comments
-      if (s[0] == '#')
+      if ( s[0] == '#' )
         continue;
 
-      if (pastDate)
-        parseLine(s, line.lineNo());
+      if ( pastDate )
+      {
+	if ( ! parseLine( s, line.lineNo() ) )
+	  break;	// requested by consumer callback
+      }
       else
       {
-        Date logDate(s.substr(0, s.find('|')), HISTORY_LOG_DATE_FORMAT);
-        if (logDate > date)
+        Date logDate( s.substr( 0, s.find('|') ), HISTORY_LOG_DATE_FORMAT );
+        if ( logDate > date_r )
         {
           pastDate = true;
-          parseLine(s, line.lineNo());
+          if ( ! parseLine( s, line.lineNo() ) )
+	    break;	// requested by consumer callback
         }
       }
     }
@@ -202,38 +152,39 @@ namespace zypp
     pd.toMax();
   }
 
-  void HistoryLogReader::Impl::readFromTo(
-      const Date & fromDate, const Date & toDate,
-      const ProgressData::ReceiverFnc & progress)
+  void HistoryLogReader::Impl::readFromTo( const Date & fromDate_r, const Date & toDate_r, const ProgressData::ReceiverFnc & progress_r )
   {
-    InputStream is(_filename);
-    iostr::EachLine line(is);
+    InputStream is( _filename );
+    iostr::EachLine line( is );
 
     ProgressData pd;
-    pd.sendTo(progress);
+    pd.sendTo( progress_r );
     pd.toMin();
 
     bool pastFromDate = false;
-    for (; line; line.next(), pd.tick())
+    for ( ; line; line.next(), pd.tick() )
     {
-      const string & s = *line;
+      const std::string & s = *line;
 
       // ignore comments
-      if (s[0] == '#')
+      if ( s[0] == '#' )
         continue;
 
-      Date logDate(s.substr(0, s.find('|')), HISTORY_LOG_DATE_FORMAT);
+      Date logDate( s.substr( 0, s.find('|') ), HISTORY_LOG_DATE_FORMAT );
 
       // past toDate - stop reading
-      if (logDate >= toDate)
+      if ( logDate >= toDate_r )
         break;
 
       // past fromDate - start reading
-      if (!pastFromDate && logDate > fromDate)
+      if ( !pastFromDate && logDate > fromDate_r )
         pastFromDate = true;
 
-      if (pastFromDate)
-        parseLine(s, line.lineNo());
+      if ( pastFromDate )
+      {
+	if ( ! parseLine( s, line.lineNo() ) )
+	  break;	// requested by consumer callback
+      }
     }
 
     pd.toMax();
@@ -241,40 +192,33 @@ namespace zypp
 
   /////////////////////////////////////////////////////////////////////
   //
-  // CLASS NAME: HistoryLogReader
+  //	class HistoryLogReader
   //
   /////////////////////////////////////////////////////////////////////
 
-  HistoryLogReader::HistoryLogReader( const Pathname & historyFile,
-                                      const ProcessItem & callback )
-    : _pimpl(new HistoryLogReader::Impl(historyFile, callback))
+  HistoryLogReader::HistoryLogReader( const Pathname & historyFile_r, const Options & options_r, const ProcessData & callback_r )
+  : _pimpl( new HistoryLogReader::Impl( historyFile_r, options_r, callback_r ) )
   {}
 
   HistoryLogReader::~HistoryLogReader()
   {}
 
-  void HistoryLogReader::setIgnoreInvalidItems(bool ignoreInvalid)
-  { _pimpl->_ignoreInvalid = ignoreInvalid; }
+  void HistoryLogReader::setIgnoreInvalidItems( bool ignoreInvalid_r )
+  { _pimpl->_options.setFlag( IGNORE_INVALID_ITEMS, ignoreInvalid_r ); }
 
   bool HistoryLogReader::ignoreInvalidItems() const
-  { return _pimpl->_ignoreInvalid; }
+  { return _pimpl->_options.testFlag( IGNORE_INVALID_ITEMS ); }
 
-  void HistoryLogReader::readAll(const ProgressData::ReceiverFnc & progress)
-  { _pimpl->readAll(progress); }
+  void HistoryLogReader::readAll( const ProgressData::ReceiverFnc & progress_r )
+  { _pimpl->readAll( progress_r ); }
 
-  void HistoryLogReader::readFrom(const Date & date,
-      const ProgressData::ReceiverFnc & progress)
-  { _pimpl->readFrom(date, progress); }
+  void HistoryLogReader::readFrom( const Date & date_r, const ProgressData::ReceiverFnc & progress_r )
+  { _pimpl->readFrom( date_r, progress_r ); }
 
-  void HistoryLogReader::readFromTo(
-      const Date & fromDate, const Date & toDate,
-      const ProgressData::ReceiverFnc & progress)
-  { _pimpl->readFromTo(fromDate, toDate, progress); }
+  void HistoryLogReader::readFromTo( const Date & fromDate_r, const Date & toDate_r, const ProgressData::ReceiverFnc & progress_r )
+  { _pimpl->readFromTo( fromDate_r, toDate_r, progress_r ); }
 
-
-    /////////////////////////////////////////////////////////////////
   } // namespace parser
   ///////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////
 } // namespace zypp
 ///////////////////////////////////////////////////////////////////

@@ -75,17 +75,24 @@ namespace zypp
     return ret;
   }
 
+  bool ResObject::needToAcceptLicense() const
+  {
+    if ( isKind<Product>() )
+      return repoInfo().needToAcceptLicense( );
+    return true;
+  }
+
   std::string ResObject::distribution() const
   { return lookupStrAttribute( sat::SolvAttr::distribution ); }
 
-  std::string ResObject::cpeId() const
-  { return lookupStrAttribute( sat::SolvAttr::cpeid ); }
+  CpeId ResObject::cpeId() const
+  { return CpeId( lookupStrAttribute( sat::SolvAttr::cpeid ), CpeId::noThrow ); }
 
   ByteCount ResObject::installSize() const
-  { return ByteCount( lookupNumAttribute( sat::SolvAttr::installsize ), ByteCount::K ); }
+  { return ByteCount( lookupNumAttribute( sat::SolvAttr::installsize ) ); }
 
   ByteCount ResObject::downloadSize() const
-  { return ByteCount( lookupNumAttribute( sat::SolvAttr::downloadsize ), ByteCount::K ); }
+  { return ByteCount( lookupNumAttribute( sat::SolvAttr::downloadsize ) ); }
 
   unsigned ResObject::mediaNr() const
   { return lookupNumAttribute( sat::SolvAttr::medianr ); }
@@ -95,13 +102,6 @@ namespace zypp
 
   Date ResObject::installtime() const
   { return Date( lookupNumAttribute( sat::SolvAttr::installtime ) ); }
-
-#warning DUMMY diskusage
-  const DiskUsage & ResObject::diskusage() const
-  {
-    static DiskUsage _du;
-    return _du;
-  }
 
    /////////////////////////////////////////////////////////////////
 } // namespace zypp
@@ -125,6 +125,7 @@ namespace zypp
     OUTS( Pattern );
     OUTS( Product );
     OUTS( SrcPackage );
+    OUTS( Application );
 #undef OUTS
     // unknow => return a plain ResObject
     return new ResObject( solvable_r );

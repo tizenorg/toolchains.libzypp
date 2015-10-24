@@ -1,0 +1,21 @@
+* Mon Aug 11 2014 Chanho Park <chanho61.park@samsung.com> upstream/14.27.0-14-g5e69f28
+- Update to 14.27.0
+
+* Thu Apr 11 2013 Anas Nashif <anas.nashif@intel.com> 12.11.0@dd0d997
+- Update to 12.11.0
+
+* Wed Mar 06 2013 Anas Nashif <anas.nashif@intel.com> accepted/trunk/20130223.004241@82e47ce
+- Enable libproxy support
+
+* Fri Feb 22 2013 Anas Nashif <anas.nashif@intel.com> accepted/trunk/20130208.050406@4dec040
+- require lsof (TZPC-988)
+
+* Thu Feb 07 2013 Anas Nashif <anas.nashif@intel.com> 12.8.0@6fdb435
+- Update to 12.8.0
+
+* Wed Jan 16 2013 Anas Nashif <anas.nashif@intel.com> accepted/trunk/20121215.174640@4a666b9
+- Use tizen-release as default release package
+
+* Sat Dec 15 2012 Anas Nashif <anas.nashif@intel.com> 12.3.0@f82e1bb
+- split locale
+

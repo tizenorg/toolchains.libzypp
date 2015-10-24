@@ -1,0 +1,11 @@
+build
+*.orig
+*.rej
+*.swp
+#*
+.#*
+*#
+.*project
+.externalToolBuilders
+.settings
+*flymake.h.gch

@@ -12,16 +12,16 @@
 #ifndef ZYPP_RESOBJECT_H
 #define ZYPP_RESOBJECT_H
 
-#include "zypp/base/Deprecated.h"
+#include "zypp/APIConfig.h"
 
 #include "zypp/Resolvable.h"
 #include "zypp/Date.h"
 #include "zypp/Locale.h"
 #include "zypp/Vendor.h"
 #include "zypp/ByteCount.h"
-#include "zypp/DiskUsage.h"
 #include "zypp/OnMediaLocation.h"
 #include "zypp/Repository.h"
+#include "zypp/CpeId.h"
 
 #include "zypp/sat/LookupAttr.h"
 #include "zypp/sat/SolvableSet.h"
@@ -130,6 +130,14 @@ namespace zypp
      */
     std::string licenseToConfirm( const Locale & lang_r = Locale() ) const;
 
+   /**
+     * \short Acceptance of Product License needed?
+     *
+     * Returns whether a product license has to be accepted
+     * (no acceptance is needed for openSUSE)
+     */
+    bool needToAcceptLicense() const;
+
     /**
      * \short Vendor
      *
@@ -143,18 +151,33 @@ namespace zypp
     */
     std::string distribution() const;
 
-    /**
-     * The Common Platform Enumeration name
-     * for this product.
-     *
-     * See http://cpe.mitre.org
-     */
-    std::string cpeId() const;
+    /** The Common Platform Enumeration name for this product. */
+    CpeId cpeId() const;
 
-    /** Installed size. */
+    /** Installed (unpacked) size.
+     * This is just a total number. Many objects provide even more detailed
+     * disk usage data. You can use \ref DiskUsageCounter to find out
+     * how objects data are distributed across partitions/directories.
+     * \code
+     *   // Load directory set into ducounter
+     *   DiskUsageCounter ducounter( { "/", "/usr", "/var" } );
+     *
+     *   // see how noch space the packages use
+     *   for ( const PoolItem & pi : pool )
+     *   {
+     *     cout << pi << ducounter.disk_usage( pi ) << endl;
+     *     // I__s_(7)GeoIP-1.4.8-3.1.2.x86_64(@System) {
+     *     // dir:[/] [ bs: 0 B ts: 0 B us: 0 B (+-: 1.0 KiB)]
+     *     // dir:[/usr] [ bs: 0 B ts: 0 B us: 0 B (+-: 133.0 KiB)]
+     *     // dir:[/var] [ bs: 0 B ts: 0 B us: 0 B (+-: 1.1 MiB)]
+     *     // }
+     *   }
+     * \endcode
+     * \see \ref DiskUsageCounter
+     */
     ByteCount installSize() const;
 
-    /** Size of the rpm package. */
+    /** Download size. */
     ByteCount downloadSize() const;
 
     /** \see \ref sat::Solvable::repository */
@@ -183,14 +206,6 @@ namespace zypp
      * 0 if the resolvable is not installed.
      */
     Date installtime() const;
-
-    /**
-     * \short Disk usage per directory
-     * A common attribute, although mostly packages require
-     * noticeable disk space. An e.g product could try to reserve
-     * a certain ammount of diskspace by providing DiskUsage data.
-     */
-    const DiskUsage & diskusage() const;
 
   protected:
     friend ResObject::Ptr makeResObject( const sat::Solvable & solvable_r );
@@ -231,6 +246,8 @@ namespace zypp
    * ResObject::Ptr q( make<ResObject>( s ) );
    * Package::Ptr   pkg( make<Package>( s ) );
    * \endcode
+   * \todo make<> was a poor choice (AFAIR because gcc had some trouble with
+   * asKind<>(sat::Solvable)). Remove it in favour of asKind<>(sat::Solvable)
   */
   template<class _Res>
   inline typename ResTraits<_Res>::PtrType make( const sat::Solvable & solvable_r )
@@ -239,6 +256,11 @@ namespace zypp
   template<>
   inline ResObject::Ptr make<ResObject>( const sat::Solvable & solvable_r )
   { return makeResObject( solvable_r ); }
+
+  /** Directly create a certain kind of ResObject from \ref sat::Solvable. */
+  template<class _Res>
+  inline typename ResTraits<_Res>::PtrType asKind( const sat::Solvable & solvable_r )
+  { return make<_Res>( solvable_r ); }
 
   /** Convert ResObject::Ptr into Ptr of a certain Kind.
    * \return \c NULL iff \a p is \c NULL or points to a Resolvable
@@ -258,11 +280,11 @@ namespace zypp
 
   template<class _Res>
   inline typename ResTraits<_Res>::constPtrType ResObject::asKind() const
-  { return make<_Res>( *this ); }
+  { return dynamic_cast<const _Res *>( this ); }
 
   template<class _Res>
   inline typename ResTraits<_Res>::PtrType ResObject::asKind()
-  { return make<_Res>( *this ); }
+  { return dynamic_cast<_Res *>( this ); }
 
   /////////////////////////////////////////////////////////////////
 } // namespace zypp

@@ -54,8 +54,14 @@ using namespace zypp::filesystem;
 #define FILEFORBACKUPFILES	"YaSTBackupModifiedFiles"
 #define MAXRPMMESSAGELINES	10000
 
+#define WORKAROUNDRPMPWDBUG
+
 namespace zypp
 {
+  namespace zypp_readonly_hack
+  {
+    bool IGotIt(); // in readonly-mode
+  }
 namespace target
 {
 namespace rpm
@@ -79,6 +85,26 @@ inline string rpmQuoteFilename( const Pathname & path_r )
   }
   return path;
 }
+
+
+  /** Workaround bnc#827609 - rpm needs a readable pwd so we
+   * chdir to /. Turn realtive pathnames into absolute ones
+   * by prepending cwd so rpm still finds them
+   */
+  inline Pathname workaroundRpmPwdBug( Pathname path_r )
+  {
+#if defined(WORKAROUNDRPMPWDBUG)
+    if ( path_r.relative() )
+    {
+      // try to prepend cwd
+      AutoDispose<char*> cwd( ::get_current_dir_name(), ::free );
+      if ( cwd )
+	return Pathname( cwd ) / path_r;
+      WAR << "Can't get cwd!" << endl;
+    }
+#endif
+    return path_r;	// no problem with absolute pathnames
+  }
 }
 
 struct KeyRingSignalReceiver : callback::ReceiveReport<KeyRingSignals>
@@ -401,9 +427,7 @@ void RpmDb::initDatabase( Pathname root_r, Pathname dbPath_r, bool doRebuild_r )
   }
 
   MIL << "Syncronizing keys with zypp keyring" << endl;
-  // we do this one by one now.
-  importZyppKeyRingTrustedKeys();
-  exportTrustedKeysInZyppKeyRing();
+  syncTrustedKeys();
 
   // Close the database in case any write acces (create/convert)
   // happened during init. This should drop any lock acquired
@@ -828,86 +852,178 @@ void RpmDb::doRebuildDatabase(callback::SendReport<RebuildDBReport> & report)
   }
 }
 
-void RpmDb::importZyppKeyRingTrustedKeys()
+///////////////////////////////////////////////////////////////////
+namespace
 {
-  MIL << "Importing zypp trusted keyring" << std::endl;
-
-  std::list<PublicKey> zypp_keys;
-  zypp_keys = getZYpp()->keyRing()->trustedPublicKeys();
-  /* The pubkeys() call below is expensive.  It calls gpg2 for each
-     gpg-pubkey in the rpm db.  Useless if we don't have any keys in
-     zypp yet.  */
-  if (zypp_keys.empty())
-    return;
-
-  std::list<PublicKey> rpm_keys = pubkeys();
-  for_( it, zypp_keys.begin(), zypp_keys.end() )
-    {
-      // we find only the left part of the long gpg key, as rpm does not support long ids
-      std::list<PublicKey>::iterator ik = find( rpm_keys.begin(), rpm_keys.end(), (*it));
-      if ( ik != rpm_keys.end() )
-        {
-          MIL << "Key " << (*it).id() << " (" << (*it).name() << ") is already in rpm database." << std::endl;
-        }
-      else
-        {
-          // now import the key in rpm
-          try
-            {
-              importPubkey( *it );
-              MIL << "Trusted key " << (*it).id() << " (" << (*it).name() << ") imported in rpm database." << std::endl;
-            }
-          catch (RpmException &e)
-            {
-              ERR << "Could not import key " << (*it).id() << " (" << (*it).name() << " from " << (*it).path() << " in rpm database" << std::endl;
-            }
-        }
-    }
-}
-
-void RpmDb::exportTrustedKeysInZyppKeyRing()
-{
-  MIL << "Exporting rpm keyring into zypp trusted keyring" <<endl;
-  librpmDb::db_const_iterator keepDbOpen; // just to keep a ref.
-
-  set<Edition>    rpm_keys( pubkeyEditions() );
-  list<PublicKey> zypp_keys( getZYpp()->keyRing()->trustedPublicKeys() );
-
-  // Temporarily disconnect to prevent the attemt to re-import the exported keys.
-  callback::TempConnect<KeyRingSignals> tempDisconnect;
-
-  TmpFile tmpfile( getZYpp()->tmpPath() );
+  /** \ref RpmDb::syncTrustedKeys helper
+   * Compute which keys need to be exprted to / imported from the zypp keyring.
+   * Return result via argument list.
+   */
+  void computeKeyRingSync( std::set<Edition> & rpmKeys_r, std::list<PublicKeyData> & zyppKeys_r )
   {
-    ofstream tmpos( tmpfile.path().c_str() );
-    for_( it, rpm_keys.begin(), rpm_keys.end() )
+    ///////////////////////////////////////////////////////////////////
+    // Remember latest release and where it ocurred
+    struct Key
     {
-      // search the zypp key into the rpm keys
-      // long id is edition version + release
-      string id = str::toUpper( (*it).version() + (*it).release());
-      list<PublicKey>::iterator ik( find( zypp_keys.begin(), zypp_keys.end(), id) );
-      if ( ik != zypp_keys.end() )
+      Key()
+	: _inRpmKeys( nullptr )
+	, _inZyppKeys( nullptr )
+      {}
+
+      void updateIf( const Edition & rpmKey_r )
       {
-	MIL << "Key " << (*it) << " is already in zypp database." << endl;
+	std::string keyRelease( rpmKey_r.release() );
+	int comp = _release.compare( keyRelease );
+	if ( comp < 0 )
+	{
+	  // update to newer release
+	  _release.swap( keyRelease );
+	  _inRpmKeys  = &rpmKey_r;
+	  _inZyppKeys = nullptr;
+	  if ( !keyRelease.empty() )
+	    DBG << "Old key in R: gpg-pubkey-" << rpmKey_r.version() << "-" <<  keyRelease << endl;
+	}
+	else if ( comp == 0 )
+	{
+	  // stay with this release
+	  if ( ! _inRpmKeys )
+	    _inRpmKeys = &rpmKey_r;
+	}
+	// else: this is an old release
+	else
+	  DBG << "Old key in R: gpg-pubkey-" << rpmKey_r.version() << "-" <<  keyRelease << endl;
       }
-      else
+
+      void updateIf( const PublicKeyData & zyppKey_r )
+      {
+	std::string keyRelease( zyppKey_r.gpgPubkeyRelease() );
+	int comp = _release.compare( keyRelease );
+	if ( comp < 0 )
+	{
+	  // update to newer release
+	  _release.swap( keyRelease );
+	  _inRpmKeys  = nullptr;
+	  _inZyppKeys = &zyppKey_r;
+	  if ( !keyRelease.empty() )
+	    DBG << "Old key in Z: gpg-pubkey-" << zyppKey_r.gpgPubkeyVersion() << "-" << keyRelease << endl;
+	}
+	else if ( comp == 0 )
+	{
+	  // stay with this release
+	  if ( ! _inZyppKeys )
+	    _inZyppKeys = &zyppKey_r;
+	}
+	// else: this is an old release
+	else
+	  DBG << "Old key in Z: gpg-pubkey-" << zyppKey_r.gpgPubkeyVersion() << "-" << keyRelease << endl;
+      }
+
+      std::string _release;
+      const Edition * _inRpmKeys;
+      const PublicKeyData * _inZyppKeys;
+    };
+    ///////////////////////////////////////////////////////////////////
+
+    // collect keys by ID(version) and latest creation(release)
+    std::map<std::string,Key> _keymap;
+
+    for_( it, rpmKeys_r.begin(), rpmKeys_r.end() )
+    {
+      _keymap[(*it).version()].updateIf( *it );
+    }
+
+    for_( it, zyppKeys_r.begin(), zyppKeys_r.end() )
+    {
+      _keymap[(*it).gpgPubkeyVersion()].updateIf( *it );
+    }
+
+    // compute missing keys
+    std::set<Edition> rpmKeys;
+    std::list<PublicKeyData> zyppKeys;
+    for_( it, _keymap.begin(), _keymap.end() )
+    {
+      DBG << "gpg-pubkey-" << (*it).first << "-" << (*it).second._release << " "
+          << ( (*it).second._inRpmKeys  ? "R" : "_" )
+	  << ( (*it).second._inZyppKeys ? "Z" : "_" ) << endl;
+      if ( ! (*it).second._inRpmKeys )
+      {
+	zyppKeys.push_back( *(*it).second._inZyppKeys );
+      }
+      if ( ! (*it).second._inZyppKeys )
+      {
+	rpmKeys.insert( *(*it).second._inRpmKeys );
+      }
+    }
+    rpmKeys_r.swap( rpmKeys );
+    zyppKeys_r.swap( zyppKeys );
+  }
+} // namespace
+///////////////////////////////////////////////////////////////////
+
+void RpmDb::syncTrustedKeys( SyncTrustedKeyBits mode_r )
+{
+  MIL << "Going to sync trusted keys..." << endl;
+  std::set<Edition> rpmKeys( pubkeyEditions() );
+  std::list<PublicKeyData> zyppKeys( getZYpp()->keyRing()->trustedPublicKeyData() );
+  computeKeyRingSync( rpmKeys, zyppKeys );
+  MIL << (mode_r & SYNC_TO_KEYRING   ? "" : "(skip) ") << "Rpm keys to export into zypp trusted keyring: " << rpmKeys.size() << endl;
+  MIL << (mode_r & SYNC_FROM_KEYRING ? "" : "(skip) ") << "Zypp trusted keys to import into rpm database: " << zyppKeys.size() << endl;
+
+  ///////////////////////////////////////////////////////////////////
+  if ( (mode_r & SYNC_TO_KEYRING) &&  ! rpmKeys.empty() )
+  {
+    // export to zypp keyring
+    MIL << "Exporting rpm keyring into zypp trusted keyring" <<endl;
+    // Temporarily disconnect to prevent the attemt to re-import the exported keys.
+    callback::TempConnect<KeyRingSignals> tempDisconnect;
+    librpmDb::db_const_iterator keepDbOpen; // just to keep a ref.
+
+    TmpFile tmpfile( getZYpp()->tmpPath() );
+    {
+      ofstream tmpos( tmpfile.path().c_str() );
+      for_( it, rpmKeys.begin(), rpmKeys.end() )
       {
 	// we export the rpm key into a file
-	RpmHeader::constPtr result( new RpmHeader() );
+	RpmHeader::constPtr result;
 	getData( string("gpg-pubkey"), *it, result );
-	MIL <<  "Will export trusted key " << (*it) << " to zypp keyring." << endl;
 	tmpos << result->tag_description() << endl;
       }
     }
+    try
+    {
+      getZYpp()->keyRing()->multiKeyImport( tmpfile.path(), true /*trusted*/);
+    }
+    catch (Exception &e)
+    {
+      ERR << "Could not import keys into in zypp keyring" << endl;
+    }
   }
-  try
+
+  ///////////////////////////////////////////////////////////////////
+  if ( (mode_r & SYNC_FROM_KEYRING) && ! zyppKeys.empty() )
   {
-    getZYpp()->keyRing()->multiKeyImport( tmpfile.path(), true /*trusted*/);
+    // import from zypp keyring
+    MIL << "Importing zypp trusted keyring" << std::endl;
+    for_( it, zyppKeys.begin(), zyppKeys.end() )
+    {
+      try
+      {
+	importPubkey( getZYpp()->keyRing()->exportTrustedPublicKey( *it ) );
+      }
+      catch ( const RpmException & exp )
+      {
+	ZYPP_CAUGHT( exp );
+      }
+    }
   }
-  catch (Exception &e)
-  {
-    ERR << "Could not import keys into in zypp keyring" << endl;
-  }
+  MIL << "Trusted keys synced." << endl;
 }
+
+void RpmDb::importZyppKeyRingTrustedKeys()
+{ syncTrustedKeys( SYNC_FROM_KEYRING ); }
+
+void RpmDb::exportTrustedKeysInZyppKeyRing()
+{ syncTrustedKeys( SYNC_TO_KEYRING ); }
 
 ///////////////////////////////////////////////////////////////////
 //
@@ -919,37 +1035,72 @@ void RpmDb::importPubkey( const PublicKey & pubkey_r )
 {
   FAILIFNOTINITIALIZED;
 
-  // check if the key is already in the rpm database and just
-  // return if it does.
-  set<Edition> rpm_keys = pubkeyEditions();
-  string keyshortid = pubkey_r.id().substr(8,8);
-  MIL << "Comparing '" << keyshortid << "' to: ";
-  for ( set<Edition>::const_iterator it = rpm_keys.begin(); it != rpm_keys.end(); ++it)
+  // bnc#828672: On the fly key import in READONLY
+  if ( zypp_readonly_hack::IGotIt() )
   {
-    string id = str::toUpper( (*it).version() );
-    MIL <<  ", '" << id << "'";
-    if ( id == keyshortid )
+    WAR << "Key " << pubkey_r << " can not be imported. (READONLY MODE)" << endl;
+    return;
+  }
+
+  // check if the key is already in the rpm database
+  Edition keyEd( pubkey_r.gpgPubkeyVersion(), pubkey_r.gpgPubkeyRelease() );
+  set<Edition> rpmKeys = pubkeyEditions();
+  bool hasOldkeys = false;
+
+  for_( it, rpmKeys.begin(), rpmKeys.end() )
+  {
+    if ( keyEd == *it ) // quick test (Edition is IdStringType!)
     {
-        // they match id
-        // now check if timestamp is different
-        Date date = Date(str::strtonum<Date::ValueType>("0x" + (*it).release()));
-        if (  date == pubkey_r.created() )
-        {
+      MIL << "Key " << pubkey_r << " is already in the rpm trusted keyring. (skip import)" << endl;
+      return;
+    }
 
-            MIL << endl << "Key " << pubkey_r << " is already in the rpm trusted keyring." << endl;
-            return;
-        }
-        else
-        {
-            MIL << endl << "Key " << pubkey_r << " has another version in keyring. ( " << date << " & " << pubkey_r.created() << ")" << endl;
+    if ( keyEd.version() != (*it).version() )
+      continue; // different key ID (version)
 
-        }
-
+    if ( keyEd.release() < (*it).release() )
+    {
+      MIL << "Key " << pubkey_r << " is older than one in the rpm trusted keyring. (skip import)" << endl;
+      return;
+    }
+    else
+    {
+      hasOldkeys = true;
     }
   }
-  // key does not exists, lets import it
-  MIL <<  endl;
+  MIL << "Key " << pubkey_r << " will be imported into the rpm trusted keyring." << (hasOldkeys?"(update)":"(new)") << endl;
 
+  if ( hasOldkeys )
+  {
+    // We must explicitly delete old key IDs first (all releases,
+    // that's why we don't call removePubkey here).
+    std::string keyName( "gpg-pubkey-" + keyEd.version() );
+    RpmArgVec opts;
+    opts.push_back ( "-e" );
+    opts.push_back ( "--allmatches" );
+    opts.push_back ( "--" );
+    opts.push_back ( keyName.c_str() );
+    // don't call modifyDatabase because it would remove the old
+    // rpm3 database, if the current database is a temporary one.
+    run_rpm( opts, ExternalProgram::Stderr_To_Stdout );
+
+    string line;
+    while ( systemReadLine( line ) )
+    {
+      ( str::startsWith( line, "error:" ) ? WAR : DBG ) << line << endl;
+    }
+
+    if ( systemStatus() != 0 )
+    {
+      ERR << "Failed to remove key " << pubkey_r << " from RPM trusted keyring (ignored)" << endl;
+    }
+    else
+    {
+      MIL << "Key " << pubkey_r << " has been removed from RPM trusted keyring" << endl;
+    }
+  }
+
+  // import the new key
   RpmArgVec opts;
   opts.push_back ( "--import" );
   opts.push_back ( "--" );
@@ -962,19 +1113,10 @@ void RpmDb::importPubkey( const PublicKey & pubkey_r )
   string line;
   while ( systemReadLine( line ) )
   {
-    if ( line.substr( 0, 6 ) == "error:" )
-    {
-      WAR << line << endl;
-    }
-    else
-    {
-      DBG << line << endl;
-    }
+    ( str::startsWith( line, "error:" ) ? WAR : DBG ) << line << endl;
   }
 
-  int rpm_status = systemStatus();
-
-  if ( rpm_status != 0 )
+  if ( systemStatus() != 0 )
   {
     //TranslatorExplanation first %s is file name, second is error message
     ZYPP_THROW(RpmSubprocessException(boost::str(boost::format(
@@ -1000,16 +1142,12 @@ void RpmDb::removePubkey( const PublicKey & pubkey_r )
   // check if the key is in the rpm database and just
   // return if it does not.
   set<Edition> rpm_keys = pubkeyEditions();
-
-  // search the key
   set<Edition>::const_iterator found_edition = rpm_keys.end();
+  std::string pubkeyVersion( pubkey_r.gpgPubkeyVersion() );
 
-  for ( set<Edition>::const_iterator it = rpm_keys.begin(); it != rpm_keys.end(); ++it)
+  for_( it, rpm_keys.begin(), rpm_keys.end() )
   {
-    string id = str::toUpper( (*it).version() );
-    string keyshortid = pubkey_r.id().substr(8,8);
-    MIL << "Comparing '" << id << "' to '" << keyshortid << "'" << endl;
-    if ( id == keyshortid )
+    if ( (*it).version() == pubkeyVersion )
     {
 	found_edition = it;
 	break;
@@ -1079,7 +1217,7 @@ list<PublicKey> RpmDb::pubkeys() const
     if (edition != Edition::noedition)
     {
       // we export the rpm key into a file
-      RpmHeader::constPtr result = new RpmHeader();
+      RpmHeader::constPtr result;
       getData( string("gpg-pubkey"), edition, result );
       TmpFile file(getZYpp()->tmpPath());
       ofstream os;
@@ -1444,6 +1582,9 @@ RpmDb::run_rpm (const RpmArgVec& opts,
   RpmArgVec args;
 
   // always set root and dbpath
+#if defined(WORKAROUNDRPMPWDBUG)
+  args.push_back("#/");		// chdir to / to workaround bnc#819354
+#endif
   args.push_back("rpm");
   args.push_back("--root");
   args.push_back(_root.asString().c_str());
@@ -1719,10 +1860,6 @@ void RpmDb::doInstallPackage( const Pathname & filename, RpmInstFlags flags, cal
     // FIXME status handling
     report->progress( 0 ); // allow 1% for backup creation.
   }
-  else
-  {
-    report->progress( 100 );
-  }
 
   // run rpm
   RpmArgVec opts;
@@ -1755,11 +1892,13 @@ void RpmDb::doInstallPackage( const Pathname & filename, RpmInstFlags flags, cal
     opts.push_back ("--justdb");
   if (flags & RPMINST_TEST)
     opts.push_back ("--test");
+  if (flags & RPMINST_NOPOSTTRANS)
+    opts.push_back ("--noposttrans");
 
   opts.push_back("--");
 
   // rpm requires additional quoting of special chars:
-  string quotedFilename( rpmQuoteFilename( filename ) );
+  string quotedFilename( rpmQuoteFilename( workaroundRpmPwdBug( filename ) ) );
   opts.push_back ( quotedFilename.c_str() );
 
   modifyDatabase(); // BEFORE run_rpm

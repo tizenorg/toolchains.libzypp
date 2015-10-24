@@ -16,8 +16,6 @@
 #include "zypp/parser/xml/XmlEscape.h"
 
 #include "zypp/RepoInfo.h"
-#include "zypp/repo/RepoInfoBaseImpl.h"
-
 #include "zypp/ServiceInfo.h"
 
 using namespace std;
@@ -31,7 +29,7 @@ namespace zypp
   //
   //  CLASS NAME : ServiceInfo::Impl
   //
-  struct ServiceInfo::Impl : public repo::RepoInfoBase::Impl
+  struct ServiceInfo::Impl
   {
     typedef ServiceInfo::ReposToEnable  ReposToEnable;
     typedef ServiceInfo::ReposToDisable ReposToDisable;
@@ -41,16 +39,16 @@ namespace zypp
     repo::ServiceType type;
     ReposToEnable  reposToEnable;
     ReposToDisable reposToDisable;
+    RepoStates     repoStates;
+
 
   public:
     Impl()
-      : repo::RepoInfoBase::Impl()
-      , type(repo::ServiceType::NONE_e)
+      : type(repo::ServiceType::NONE_e)
     {}
 
     Impl(const Url & url_)
-      : repo::RepoInfoBase::Impl()
-      , url(url_)
+      : url(url_)
       , type(repo::ServiceType::NONE_e)
     {}
 
@@ -164,12 +162,43 @@ namespace zypp
   void ServiceInfo::clearReposToDisable()
   { _pimpl->reposToDisable.clear(); }
 
+  const ServiceInfo::RepoStates & ServiceInfo::repoStates() const
+  { return _pimpl->repoStates; }
+
+  void ServiceInfo::setRepoStates( RepoStates newStates_r )
+  { swap( _pimpl->repoStates, newStates_r ); }
+
+  std::ostream & operator<<( std::ostream & str, const ServiceInfo::RepoState & obj )
+  {
+    return str
+	<< "enabled=" << obj.enabled << " "
+	<< "autorefresh=" << obj.autorefresh << " "
+	<< "priority=" << obj.priority;
+  }
 
   std::ostream & ServiceInfo::dumpAsIniOn( std::ostream & str ) const
   {
     RepoInfoBase::dumpAsIniOn(str)
       << "url = " << url() << endl
       << "type = " << type() << endl;
+
+    if ( ! repoStates().empty() )
+    {
+      unsigned cnt = 0U;
+      for ( const auto & el : repoStates() )
+      {
+	std::string tag( "repo_" );
+	tag += str::numstring( ++cnt );
+	const RepoState & state( el.second );
+
+	str << tag << "=" << el.first << endl
+	    << tag << "_enabled=" << state.enabled << endl
+	    << tag << "_autorefresh=" << state.autorefresh << endl;
+	if ( state.priority != RepoInfo::defaultPriority() )
+	  str
+	    << tag << "_priority=" << state.priority << endl;
+      }
+    }
 
     if ( ! reposToEnableEmpty() )
       str << "repostoenable = " << str::joinEscaped( reposToEnableBegin(), reposToEnableEnd() ) << endl;
@@ -178,10 +207,7 @@ namespace zypp
     return str;
   }
 
-  std::ostream & ServiceInfo::dumpAsXMLOn(std::ostream & str) const
-  { return dumpAsXMLOn(str, ""); }
-
-  ostream & ServiceInfo::dumpAsXMLOn( ostream & str, const string & content) const
+  ostream & ServiceInfo::dumpAsXmlOn( ostream & str, const string & content ) const
   {
     str
       << "<service"

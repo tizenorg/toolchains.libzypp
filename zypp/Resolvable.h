@@ -15,7 +15,7 @@
 #include <iosfwd>
 #include <string>
 
-#include "zypp/base/Deprecated.h"
+#include "zypp/APIConfig.h"
 
 #include "zypp/base/ReferenceCounted.h"
 #include "zypp/base/NonCopyable.h"
@@ -36,7 +36,7 @@ namespace zypp
   /** Interface base for resolvable objects (identification and dependencies).
    * \todo Merge with ResObject
   */
-  class Resolvable : protected sat::Solvable,
+  class Resolvable : protected zypp::sat::Solvable,	// Note: gcc bug #52841 prohibits using just sat::Solvable
                      public base::ReferenceCounted, private base::NonCopyable
   {
     friend std::ostream & operator<<( std::ostream & str, const Resolvable & obj );
@@ -49,10 +49,6 @@ namespace zypp
     typedef TraitsType::constPtrType constPtr;
 
   public:
-#ifndef SWIG // Swig treats it as syntax error
-    /** Whether this represents a valid- or no-solvable. */
-    using sat::Solvable::operator bool_type;
-#endif
     /** Whether this represents an installed solvable. */
     bool isSystem() const
     { return sat::Solvable::isSystem(); }
@@ -172,12 +168,12 @@ namespace zypp
   // Specialization for Resolvable: Always true.
   template<>
     inline bool isKind<Resolvable>( const Resolvable::constPtr & p )
-    { return p; }
+    { return !!p; }
 
   // Specialization for ResObject: Always true.
   template<>
     inline bool isKind<ResObject>( const Resolvable::constPtr & p )
-    { return p; }
+    { return !!p; }
 
 
   /** Convert Resolvable::Ptr into Ptr of a certain Kind.

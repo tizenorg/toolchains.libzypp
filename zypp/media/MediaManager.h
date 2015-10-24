@@ -12,13 +12,13 @@
 #ifndef ZYPP_MEDIA_MEDIAMANAGER_H
 #define ZYPP_MEDIA_MEDIAMANAGER_H
 
-#include <zypp/media/MediaAccess.h>
+#include "zypp/media/MediaAccess.h"
 
-#include <zypp/base/Deprecated.h>
-#include <zypp/base/NonCopyable.h>
-#include <zypp/base/PtrTypes.h>
-#include <zypp/Pathname.h>
-#include <zypp/Url.h>
+#include "zypp/APIConfig.h"
+#include "zypp/base/NonCopyable.h"
+#include "zypp/base/PtrTypes.h"
+#include "zypp/Pathname.h"
+#include "zypp/Url.h"
 
 #include <list>
 
@@ -342,10 +342,11 @@ namespace zypp
      *     Mandatory URL component, that specifies the share name with
      *     optional subdirectory, where the desired files are located.
      *
-     * \subsection MediaCurl_Url MediaCurl - FTP/HTTP directory tree (ftp, http, https)
+     * \subsection MediaCurl_Url MediaCurl - FTP/HTTP directory tree (ftp, tftp, http, https)
      * The access handler to media directory tree on a ftp/http server.
      *   - Scheme:
      *     - <b>ftp</b>
+     *     - <b>tftp</b>
      *     - <b>http</b>
      *     - <b>https</b>
      *   - Examples:
@@ -383,6 +384,8 @@ namespace zypp
      *       Turn off using cookies by setting it to "0" (or false, no, off).
      *     - <tt>proxy</tt>:
      *       A proxy hostname or hostname and port separated by ':'.
+     *       Setting the hostname to '_none_' explicitly disables the use of a
+     *       proxy even if configured in /etc/sysconfig/proxy or the environment.
      *     - <tt>proxyport</tt>:
      *       Alternative way to provide the proxy port.
      *     - <tt>proxyuser</tt>:
@@ -405,6 +408,8 @@ namespace zypp
      *       - 'peer': Verifies whether the certificate provided by the
      *         server is authentic against the chain of digital signatures
      *         found in <tt>ssl_capath</tt>.
+     *     - <tt>ssl_clientcert</tt>
+     *       Path to a ssl client certificate for authentication to a repo.
      *     - <tt>timeout</tt>:
      *       Transfer timeout in seconds between 0 and 3600, 0 disables
      *       the timeout, default timeout is 180 seconds.
@@ -414,7 +419,7 @@ namespace zypp
      *       Note, that this list depends on the list of methods supported
      *       by the curl library.
      *     - <tt>mediahandler</tt>: Set the mediahandler for this url
-     *     Valid values are: 'curl', 'multicurl', 'aria2c'
+     *     Valid values are: 'curl', 'multicurl'
      *   - Authority:
      *     The authority component has to provide a hostname. Optionally
      *     also a username and password. In case of the 'ftp' scheme,
@@ -544,11 +549,6 @@ namespace zypp
       bool
       downloads(MediaAccessId accessId) const;
 
-     /** \deprecated Use \ref Url::schemeIsDownloading */
-      static
-      ZYPP_DEPRECATED bool downloads(const Url &url)
-      { return url.schemeIsDownloading(); }
-
       /**
        * Returns the \ref MediaAccessUrl of the media access id.
        *
@@ -609,10 +609,6 @@ namespace zypp
        */
       void
       attach(MediaAccessId accessId);
-
-      /** \deprecated Simply use \ref attach. */
-      ZYPP_DEPRECATED void attachDesiredMedia(MediaAccessId accessId)
-      { attach( accessId ); }
 
       /**
        * Release the attached media and optionally eject.

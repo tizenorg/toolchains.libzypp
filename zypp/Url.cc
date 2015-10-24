@@ -10,10 +10,11 @@
  * \file zypp/Url.cc
  */
 
-#include <zypp/Url.h>
-#include <zypp/base/Gettext.h>
-#include <zypp/base/String.h>
-#include <zypp/base/Regex.h>
+#include "zypp/Url.h"
+#include "zypp/Pathname.h"
+#include "zypp/base/Gettext.h"
+#include "zypp/base/String.h"
+#include "zypp/base/Regex.h"
 #include <stdexcept>
 #include <iostream>
 
@@ -214,6 +215,7 @@ namespace zypp
         ref->config("path_encode_slash2", "y"); // always encode 2. slash
         addUrlByScheme("ftp",    ref);
         addUrlByScheme("sftp",   ref);
+        addUrlByScheme("tftp",   ref);
       }
 
       bool
@@ -379,7 +381,7 @@ namespace zypp
     catch( ... )
     {}
 
-    if(ret && out.size() == 5)
+    if(ret && out.size() == 6)
     {
       std::string scheme = out[1];
       if (scheme.size() > 1)
@@ -459,7 +461,7 @@ namespace zypp
 
   bool Url::schemeIsRemote( const std::string & scheme_r )
   {
-    static const char * val[] = { "http", "https", "nfs", "nfs4", "smb", "cifs", "ftp", "sftp" };
+    static const char * val[] = { "http", "https", "nfs", "nfs4", "smb", "cifs", "ftp", "sftp", "tftp" };
     return isInList( arrayBegin(val), arrayEnd(val), scheme_r );
   }
 
@@ -471,7 +473,7 @@ namespace zypp
 
   bool Url::schemeIsDownloading( const std::string & scheme_r )
   {
-    static const char * val[] = { "http", "https", "ftp", "sftp" };
+    static const char * val[] = { "http", "https", "ftp", "sftp", "tftp" };
     return isInList( arrayBegin(val), arrayEnd(val), scheme_r );
   }
   ///////////////////////////////////////////////////////////////////
@@ -759,6 +761,19 @@ namespace zypp
     m_impl->setPathName(path, eflag);
   }
 
+  void
+  Url::setPathName(const Pathname &path,
+                   EEncoding         eflag)
+  {
+    m_impl->setPathName(path.asString(), eflag);
+  }
+
+  void
+  Url::setPathName(const char *path,
+                   EEncoding         eflag)
+  {
+    m_impl->setPathName(path, eflag);
+  }
 
   // -----------------------------------------------------------------
   void

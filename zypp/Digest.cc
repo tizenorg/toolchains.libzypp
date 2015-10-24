@@ -14,6 +14,8 @@
 
 #include <cstdio> // snprintf
 #include <openssl/evp.h>
+#include <openssl/conf.h>
+#include <openssl/engine.h>
 #include <string>
 #include <string.h>
 
@@ -93,6 +95,9 @@ namespace zypp {
     {
       if(!openssl_digests_added)
       {
+      	OPENSSL_config(NULL);
+      	ENGINE_load_builtin_engines();
+      	ENGINE_register_all_complete();
     	OpenSSL_add_all_digests();
     	openssl_digests_added = true;
       }
@@ -169,12 +174,12 @@ namespace zypp {
     std::string Digest::digest()
     {
       if(!_dp->maybeInit())
-    	return false;
+    	return std::string();
 
       if(!_dp->finalized)
       {
     	if(!EVP_DigestFinal_ex(&_dp->mdctx, _dp->md_value, &_dp->md_len))
-    	    return false;
+    	    return std::string();
 
     	_dp->finalized = true;
       }
@@ -197,11 +202,11 @@ namespace zypp {
         return r;
 
       if(!_dp->finalized)
-      {   
+      {
         if(!EVP_DigestFinal_ex(&_dp->mdctx, _dp->md_value, &_dp->md_len))
             return r;
         _dp->finalized = true;
-      }   
+      }
       r.reserve(_dp->md_len);
       for(unsigned i = 0; i < _dp->md_len; ++i)
 	r.push_back(_dp->md_value[i]);

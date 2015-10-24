@@ -15,6 +15,7 @@
 #include <sstream>
 
 #include "zypp/TmpPath.h"
+#include "zypp/Date.h"
 #include "zypp/base/LogTools.h"
 #include "zypp/base/String.h"
 #include "zypp/media/MediaHandler.h"
@@ -383,45 +384,51 @@ MediaHandler::createAttachPoint(const Pathname &attach_root) const
     return apoint;
   }
 
-  PathInfo adir( attach_root);
-  if( !adir.isDir() || (getuid() != 0 && !adir.userMayRWX())) {
+  PathInfo adir( attach_root );
+  if( !adir.isDir() || (geteuid() != 0 && !adir.userMayRWX())) {
     DBG << "Create attach point: attach root is not a writable directory: '"
         << attach_root << "'" << std::endl;
     return apoint;
   }
 
-  DBG << "Trying to create attach point in " << attach_root << std::endl;
-
-  //
-  // FIXME: use mkdtemp?
-  //
-#warning Use class TmpDir from TmpPath.h
-  Pathname abase( attach_root + "AP_" );
-  //        ma and sh need more than 42 for debugging :-)
-  //        since the readonly fs are handled now, ...
-  for ( unsigned i = 1; i < 1000; ++i ) {
-    adir( Pathname::extend( abase, str::hexstring( i ) ) );
-    if ( ! adir.isExist() ) {
-      int err = mkdir( adir.path() );
-      if (err == 0 ) {
-        apoint = getRealPath(adir.asString());
-	if( apoint.empty())
-	{
-	  ERR << "Unable to resolve a real path for "
-	      << adir.path() << std::endl;
-	  rmdir(adir.path());
-	}
-        break;
+  static bool cleanup_once( true );
+  if ( cleanup_once )
+  {
+    cleanup_once = false;
+    DBG << "Look for orphaned attach points in " << adir << std::endl;
+    std::list<std::string> entries;
+    filesystem::readdir( entries, attach_root, false );
+    for ( const std::string & entry : entries )
+    {
+      if ( ! str::hasPrefix( entry, "AP_0x" ) )
+	continue;
+      PathInfo sdir( attach_root + entry );
+      if ( sdir.isDir()
+	&& sdir.dev() == adir.dev()
+	&& ( Date::now()-sdir.mtime() > Date::month ) )
+      {
+	DBG << "Remove orphaned attach point " << sdir << std::endl;
+	filesystem::recursive_rmdir( sdir.path() );
       }
-      else
-      if (err != EEXIST)	// readonly fs or other, dont try further
-        break;
     }
   }
 
-  if ( apoint.empty()) {
-    ERR << "Unable to create an attach point below of "
-        << attach_root << std::endl;
+  filesystem::TmpDir tmpdir( attach_root, "AP_0x" );
+  if ( tmpdir )
+  {
+    apoint = getRealPath( tmpdir.path().asString() );
+    if ( ! apoint.empty() )
+    {
+      tmpdir.autoCleanup( false );	// Take responsibility for cleanup.
+    }
+    else
+    {
+      ERR << "Unable to resolve real path for attach point " << tmpdir << std::endl;
+    }
+  }
+  else
+  {
+    ERR << "Unable to create attach point below " << attach_root << std::endl;
   }
   return apoint;
 }
@@ -502,7 +509,7 @@ MediaHandler::checkAttached(bool matchMountFs) const
 {
   bool _isAttached = false;
 
-  AttachedMedia ref( attachedMedia());
+  AttachedMedia ref( attachedMedia() );
   if( ref.mediaSource )
   {
     time_t old_mtime = _attach_mtime;
@@ -522,11 +529,13 @@ MediaHandler::checkAttached(bool matchMountFs) const
       MountEntries entries( MediaManager::getMountEntries());
       for_( e, entries.begin(), entries.end() )
       {
+	if ( ref.attachPoint->path != Pathname(e->dir) )
+	  continue;	// at least the mount points must match
+
         bool        is_device = false;
         PathInfo    dev_info;
-
         if( str::hasPrefix( Pathname(e->src).asString(), "/dev/" ) &&
-            dev_info(e->src) && dev_info.isBlk())
+            dev_info(e->src) && dev_info.isBlk() )
         {
           is_device = true;
         }
@@ -537,8 +546,7 @@ MediaHandler::checkAttached(bool matchMountFs) const
           std::string mtype(matchMountFs ? e->type : ref.mediaSource->type);
           MediaSource media(mtype, e->src, dev_info.major(), dev_info.minor());
 
-          if( ref.mediaSource->equals( media) &&
-              ref.attachPoint->path == Pathname(e->dir))
+          if( ref.mediaSource->equals( media ) )
           {
             DBG << "Found media device "
                 << ref.mediaSource->asString()
@@ -552,25 +560,44 @@ MediaHandler::checkAttached(bool matchMountFs) const
         if(!is_device && (!ref.mediaSource->maj_nr ||
 	                  !ref.mediaSource->bdir.empty()))
         {
-          std::string mtype(matchMountFs ? e->type : ref.mediaSource->type);
 	  if( ref.mediaSource->bdir.empty())
 	  {
-	    MediaSource media(mtype, e->src);
+	    // bnc#710269: Type nfs may appear as nfs4 in in the mount table
+	    // and maybe vice versa. Similar cifs/smb. Need to unify these types:
+	    if ( matchMountFs && e->type != ref.mediaSource->type )
+	    {
+	      if ( str::hasPrefix( e->type, "nfs" ) && str::hasPrefix( ref.mediaSource->type, "nfs" ) )
+		matchMountFs = false;
+	      else if ( ( e->type == "cifs" || e->type == "smb" ) && ( ref.mediaSource->type == "cifs" || ref.mediaSource->type == "smb" ) )
+		matchMountFs = false;
+	      else
+		continue;	// different types cannot match
+	    }
+	    // Here: Types are ok or not to check.
+	    // Check the name except for nfs (bnc#804544; symlink resolution in mount path)
+	    //
+	    //   [fibonacci]$ ls -l /Local/ma/c12.1
+	    //   lrwxrwxrwx  /Local/ma/c12.1 -> zypp-SuSE-Code-12_1-Branch/
+	    //
+	    //   [localhost]$ mount -t nfs4 fibonacci:/Local/ma/c12.1 /mnt
+	    //   [localhost]$ mount
+	    //   fibonacci:/Local/ma/zypp-SuSE-Code-12_1-Branch on /mnt
 
-	    if( ref.mediaSource->equals( media) &&
-                ref.attachPoint->path == Pathname(e->dir))
+	    // std::string mtype(matchMountFs ? e->type : ref.mediaSource->type);
+	    // MediaSource media(mtype, e->src);
+
+	    if( ref.mediaSource->name == e->src || str::hasPrefix( ref.mediaSource->type, "nfs" ) )
 	    {
 	      DBG << "Found media name "
-                  << ref.mediaSource->asString()
-                  << " in the mount table as " << e->src << std::endl;
+	      << ref.mediaSource->asString()
+	      << " in the mount table as " << e->src << std::endl;
 	      _isAttached = true;
 	      break;
 	    }
 	  }
 	  else
 	  {
-	    if(ref.mediaSource->bdir == e->src &&
-	       ref.attachPoint->path == Pathname(e->dir))
+	    if ( ref.mediaSource->bdir == e->src )
 	    {
 	      DBG << "Found bound media "
 	          << ref.mediaSource->asString()

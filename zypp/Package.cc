@@ -9,6 +9,8 @@
 /** \file	zypp/Package.cc
  *
 */
+#include <fstream>
+
 #include "zypp/base/Logger.h"
 #include "zypp/base/String.h"
 #include "zypp/Package.h"
@@ -50,30 +52,43 @@ namespace zypp
     static const IdString support_l2( "support_l2" );
     static const IdString support_l3( "support_l3" );
 
-    Keywords kw( keywords() );
-    for_( it, kw.begin(), kw.end() )
+    VendorSupportOption ret( VendorSupportUnknown );
+    // max over all identical packages
+    for ( const auto & solv : sat::WhatProvides( (Capability(ident().id())) ) )
     {
-      if ( *it == support_unsupported )
-        return VendorSupportUnsupported;
-      if ( *it == support_acc )
-        return VendorSupportACC;
-      if ( *it == support_l1 )
-        return VendorSupportLevel1;
-      if ( *it == support_l2 )
-        return VendorSupportLevel2;
-      if ( *it == support_l3 )
-        return VendorSupportLevel3;
+      if ( solv.edition() == edition()
+	&& solv.ident() == ident()
+	&& identical( solv ) )
+      {
+	for ( PackageKeyword kw : Keywords( sat::SolvAttr::keywords, solv ) )
+	{
+	  switch ( ret )
+	  {
+	    case VendorSupportUnknown:
+	      if ( kw == support_unsupported )	{ ret = VendorSupportUnsupported; break; }
+	    case VendorSupportUnsupported:
+	      if ( kw == support_acc )	{ ret = VendorSupportACC; break; }
+	    case VendorSupportACC:
+	      if ( kw == support_l1 )	{ ret = VendorSupportLevel1; break; }
+	    case VendorSupportLevel1:
+	      if ( kw == support_l2 )	{ ret = VendorSupportLevel2; break; }
+	    case VendorSupportLevel2:
+	      if ( kw == support_l3 )	{ return VendorSupportLevel3; break; }
+	    case VendorSupportLevel3:
+	      /* make gcc happy */ break;
+	  }
+	}
+      }
     }
-    return VendorSupportUnknown;
+    return ret;
   }
 
   bool Package::maybeUnsupported() const
   {
-      if ( ( vendorSupport() == VendorSupportUnknown ) ||
-           ( vendorSupport() == VendorSupportACC ) ||
-           ( vendorSupport() == VendorSupportUnsupported ) )
-          return true;
-      return false;
+    static const VendorSupportOptions unsupportedOpts( VendorSupportUnknown
+						     | VendorSupportUnsupported
+						     | VendorSupportACC );
+    return unsupportedOpts.testFlag( vendorSupport() );
   }
 
   Changelog Package::changelog() const
@@ -134,6 +149,43 @@ namespace zypp
 
   OnMediaLocation Package::location() const
   { return lookupLocation(); }
+
+  namespace
+  {
+    bool schemeIsLocalDir( const Url & url_r )
+    {
+      std::string s( url_r.getScheme() );
+      return s == "dir" || s == "file";
+    }
+  }
+
+  Pathname Package::cachedLocation() const
+  {
+    OnMediaLocation loc( location() );
+    PathInfo pi( repoInfo().packagesPath() / loc.filename() );
+
+    if ( ! pi.isExist() )
+      return Pathname();	// no file in cache
+
+    if ( loc.checksum().empty() )
+    {
+      Url url( repoInfo().url() );
+      if ( ! schemeIsLocalDir( url ) )
+	return Pathname();	// same name but no checksum to verify
+
+      // for local repos compare with the checksum in repo
+      if ( CheckSum( CheckSum::md5Type(), std::ifstream( (url.getPathName() / loc.filename()).c_str() ) )
+	!= CheckSum( CheckSum::md5Type(), std::ifstream( pi.c_str() ) ) )
+	return Pathname();	// same name but wrong checksum
+    }
+    else
+    {
+      if ( loc.checksum() != CheckSum( loc.checksum().type(), std::ifstream( pi.c_str() ) ) )
+	return Pathname();	// same name but wrong checksum
+    }
+
+    return pi.path();		// the right one
+  }
 
   std::string Package::sourcePkgName() const
   {

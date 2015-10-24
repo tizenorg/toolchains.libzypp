@@ -76,6 +76,9 @@ namespace zypp
      */
     virtual KeyTrust askUserToAcceptKey( const PublicKey &key, const KeyContext &keycontext = KeyContext() );
 
+    /** Informal callback showing the trusted key that will be used for verification. */
+    virtual void infoVerify( const std::string & file_r, const PublicKeyData & keyData_r, const KeyContext &keycontext = KeyContext() );
+
     virtual bool askUserToAcceptUnsignedFile( const std::string &file, const KeyContext &keycontext = KeyContext() );
 
     /**
@@ -188,6 +191,12 @@ namespace zypp
 
     void dumpPublicKey( const std::string &id, bool trusted, std::ostream &stream );
 
+    /** Export a public key identified by its key data. */
+    PublicKey exportPublicKey( const PublicKeyData & keyData );
+
+    /** Export a trusted public key identified by its key data. */
+    PublicKey exportTrustedPublicKey( const PublicKeyData & keyData );
+
     /**
      * reads the public key id from a signature
      */
@@ -196,7 +205,7 @@ namespace zypp
     /**
      * true if the key id is trusted
      */
-    bool isKeyTrusted( const std::string &id);
+    bool isKeyTrusted( const std::string &id );
 
     /**
      * true if the key id is knows, that means
@@ -208,27 +217,27 @@ namespace zypp
      * removes a key from the keyring.
      * If trusted is true, Remove it from trusted keyring too.
      */
-    void deleteKey( const std::string &id, bool trusted =  false);
+    void deleteKey( const std::string &id, bool trusted =  false );
 
     /**
-     * Get a list of public keys in the keyring
+     * Get a list of public keys in the keyring (incl. ASCII armored keys in tmpfiles)
      */
     std::list<PublicKey> publicKeys();
 
     /**
-     * Get a list of trusted public keys in the keyring
+     * Get a list of trusted public keys in the keyring (incl. ASCII armored keys in tmpfiles)
      */
     std::list<PublicKey> trustedPublicKeys();
 
     /**
-     * Get a list of public key ids in the keyring
+     * Get a list of public key data in the keyring (key data only)
      */
-    std::list<std::string> publicKeyIds();
+    std::list<PublicKeyData> publicKeyData();
 
     /**
-     * Get a list of trusted public key ids in the keyring
+     * Get a list of trusted public key data in the keyring (key data only)
      */
-    std::list<std::string> trustedPublicKeyIds();
+    std::list<PublicKeyData> trustedPublicKeyData();
 
     /**
      * Follows a signature verification interacting with the user.
@@ -267,16 +276,16 @@ namespace zypp
      * \param file Path of the file to be verified
      * \param signature Signature to verify the file against
      */
-    bool verifyFileSignature( const Pathname &file, const Pathname &signature);
+    bool verifyFileSignature( const Pathname &file, const Pathname &signature );
 
-    bool verifyFileTrustedSignature( const Pathname &file, const Pathname &signature);
+    bool verifyFileTrustedSignature( const Pathname &file, const Pathname &signature );
 
     /** Dtor */
     ~KeyRing();
 
   private:
     /** Pointer to implementation */
-    RWCOW_pointer<Impl> _pimpl;
+    RW_pointer<Impl> _pimpl;
   };
   ///////////////////////////////////////////////////////////////////
 

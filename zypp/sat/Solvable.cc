@@ -16,6 +16,7 @@
 #include "zypp/base/Exception.h"
 #include "zypp/base/Functional.h"
 #include "zypp/base/Collector.h"
+#include "zypp/base/Xml.h"
 
 #include "zypp/sat/detail/PoolImpl.h"
 #include "zypp/sat/Solvable.h"
@@ -42,7 +43,7 @@ namespace zypp
         if ( ! _ident )
           return;
 
-	ResKind explicitKind = Solvable::SplitIdent::explicitKind( _ident.c_str() );
+	ResKind explicitKind = ResKind::explicitBuiltin( _ident.c_str() );
 	// NOTE: kind package and srcpackage do not have namespaced ident!
 	if ( ! explicitKind  )
 	{
@@ -50,7 +51,7 @@ namespace zypp
 	  // No kind defaults to package
 	  if ( !_kind )
 	    _kind = ResKind::package;
-	  if ( ! ( _kind == ResKind::package || _kind == ResKind::srcpackage ) )
+	  else if ( ! ( _kind == ResKind::package || _kind == ResKind::srcpackage ) )
 	    _ident = IdString( str::form( "%s:%s", _kind.c_str(), _ident.c_str() ) );
 	}
 	else
@@ -86,33 +87,6 @@ namespace zypp
     : _ident( name_r )
     , _kind( kind_r )
     { _doSplit( _ident, _kind, _name ); }
-
-    ResKind Solvable::SplitIdent::explicitKind( const char * ident_r )
-    {
-      if ( ! ident_r )
-	return ResKind();
-
-      const char * sep = ::strchr( ident_r, ':' );
-      if ( ! sep )
-	return ResKind();
-
-      ResKind ret;
-      if ( sep-ident_r >= 4 )
-      {
-	switch ( ident_r[3] )
-	{
-	  #define OUTS(K,S) if ( !::strncmp( ident_r, ResKind::K.c_str(), S ) && ident_r[S] == ':' ) ret = ResKind::K
-	  //             ----v
-	  case 'c': OUTS( patch, 5 );       break;
-	  case 'd': OUTS( product, 7 );     break;
-	  case 'k': OUTS( package, 7 );     break;
-	  case 'p': OUTS( srcpackage, 10 ); break;
-	  case 't': OUTS( pattern, 7 );     break;
-	  #undef OUTS
-	}
-      }
-      return ret;
-    }
 
     /////////////////////////////////////////////////////////////////
 
@@ -193,7 +167,7 @@ namespace zypp
       return s ? s : std::string();
    }
 
-    unsigned Solvable::lookupNumAttribute( const SolvAttr & attr ) const
+    unsigned long long Solvable::lookupNumAttribute( const SolvAttr & attr ) const
     {
       NO_SOLVABLE_RETURN( 0 );
       return ::solvable_lookup_num( _solvable, attr.id(), 0 );
@@ -235,7 +209,7 @@ namespace zypp
         static const sat::SolvAttr susetagsDatadir( "susetags:datadir" );
         Pathname ret;
         // First look for repo attribute "susetags:datadir". If not found,
-        // look into the solvables as Code11 satsolver placed it there.
+        // look into the solvables as Code11 libsolv placed it there.
         sat::LookupRepoAttr datadir( susetagsDatadir, repor_r );
         if ( ! datadir.empty() )
           ret = datadir.begin().asString();
@@ -255,9 +229,11 @@ namespace zypp
       NO_SOLVABLE_RETURN( OnMediaLocation() );
       // medianumber and path
       unsigned medianr;
-      char * file = ::solvable_get_location( _solvable, &medianr );
+      const char * file = ::solvable_lookup_location( _solvable, &medianr );
       if ( ! file )
         return OnMediaLocation();
+      if ( ! medianr )
+	medianr = 1;
 
       OnMediaLocation ret;
 
@@ -284,10 +260,10 @@ namespace zypp
           break;
       }
       ret.setLocation    ( path/file, medianr );
-      ret.setDownloadSize( ByteCount( lookupNumAttribute( SolvAttr::downloadsize ), ByteCount::K ) );
+      ret.setDownloadSize( ByteCount( lookupNumAttribute( SolvAttr::downloadsize ) ) );
       ret.setChecksum    ( lookupCheckSumAttribute( SolvAttr::checksum ) );
       // Not needed/available for solvables?
-      //ret.setOpenSize    ( ByteCount( lookupNumAttribute( SolvAttr::opensize ), ByteCount::K ) );
+      //ret.setOpenSize    ( ByteCount( lookupNumAttribute( SolvAttr::opensize ) ) );
       //ret.setOpenChecksum( lookupCheckSumAttribute( SolvAttr::openchecksum ) );
       return ret;
     }
@@ -304,30 +280,18 @@ namespace zypp
           break;
       }
 
+      // either explicitly prefixed...
       const char * ident = IdString( _solvable->name ).c_str();
+      ResKind knownKind( ResKind::explicitBuiltin( ident ) );
+      if ( knownKind )
+	return knownKind;
+
+      // ...or no ':' in package names (hopefully)...
       const char * sep = ::strchr( ident, ':' );
-
-      // no ':' in package names (hopefully)
       if ( ! sep )
-        return ResKind::package;
+	return ResKind::package;
 
-      // quick check for well known kinds
-      if ( sep-ident >= 4 )
-      {
-        switch ( ident[3] )
-        {
-#define OUTS(K,S) if ( !::strncmp( ident, ResKind::K.c_str(), S ) ) return ResKind::K
-          //             ----v
-          case 'c': OUTS( patch, 5 );       break;
-          case 'd': OUTS( product, 7 );     break;
-          case 'k': OUTS( package, 7 );     break;
-          case 'p': OUTS( srcpackage, 10 ); break;
-          case 't': OUTS( pattern, 7 );     break;
-#undef OUTS
-        }
-      }
-
-      // an unknown kind
+      // ...or something unknown.
       return ResKind( std::string( ident, sep-ident ) );
     }
 
@@ -509,6 +473,16 @@ namespace zypp
                         IdString( _solvable->arch ).c_str() );
     }
 
+    std::string Solvable::asUserString() const\
+    {
+      NO_SOLVABLE_RETURN( (_id == detail::systemSolvableId ? "systemSolvable" : "noSolvable") );
+      return str::form( "%s-%s.%s(%s)",
+                        IdString( _solvable->name ).c_str(),
+                        IdString( _solvable->evr ).c_str(),
+                        IdString( _solvable->arch ).c_str(),
+                        repository().asUserString().c_str() );
+    }
+
     bool Solvable::identical( Solvable rhs ) const
     {
       NO_SOLVABLE_RETURN( ! rhs.get() );
@@ -660,6 +634,18 @@ namespace zypp
         OUTS(SUPPLEMENTS);
 #undef OUTS
       }
+      return str;
+    }
+
+    std::ostream & dumpAsXmlOn( std::ostream & str, const Solvable & obj )
+    {
+      xmlout::Node guard( str, "solvable" );
+
+      dumpAsXmlOn( *guard, obj.kind() );
+      *xmlout::Node( *guard, "name" ) << obj.name();
+      dumpAsXmlOn( *guard, obj.edition() );
+      dumpAsXmlOn( *guard, obj.arch() );
+      dumpAsXmlOn( *guard, obj.repository() );
       return str;
     }
 

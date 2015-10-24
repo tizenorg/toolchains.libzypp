@@ -18,13 +18,57 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <boost/format.hpp>
 
 #include "zypp/base/Easy.h"
 #include "zypp/base/PtrTypes.h"
+#include "zypp/base/Function.h"
+
+
+///////////////////////////////////////////////////////////////////
+namespace boost
+{
+  /** A formater with (N)o (A)rgument (C)heck.
+   * It won't complain about missing or excess arguments. Sometimes
+   * usefull when dealing with translations or classes providing a
+   * default formater.
+   */
+  inline format formatNAC( const std::string & string_r ) {
+    using namespace boost::io;
+    format fmter( string_r );
+    fmter.exceptions( all_error_bits ^ ( too_many_args_bit | too_few_args_bit ) );
+    return fmter;
+  }
+} // namespace boost
+namespace zypp { using boost::formatNAC; }
+///////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////
+namespace zypp
+{
+  /** Request a human readable (translated) string representation of _Tp [_Tp.asUserString()]
+   * Classes may implement a default as member function.
+   */
+  template <class _Tp>
+  std::string asUserString( const _Tp & val_r )
+  { return val_r.asUserString(); }
+
+}// namespace zypp
+///////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////
 namespace zypp
 { /////////////////////////////////////////////////////////////////
+
+  struct MessageString : public std::string
+  {
+    MessageString() {}
+    MessageString( const char * str_r ) 		: std::string( str_r ? str_r : "" ) {}
+    MessageString( const std::string & str_r )		: std::string( str_r ) {}
+    // boost::format, std::ostringstream, str::Str ...
+    template<class _Str>
+    MessageString( const _Str & str_r )	: std::string( str_r.str() ) {}
+  };
 
   /** Convenience \c char* constructible from \c std::string and \c char*,
    *  it maps \c (char*)0 to an empty string.
@@ -111,7 +155,15 @@ namespace zypp
     inline std::string asString( const std::string &t )
     { return t; }
 
+#ifndef SWIG // Swig treats it as syntax error
+    inline std::string asString( std::string && t )
+    { return std::move(t); }
+#endif
+
     inline std::string asString( const char * t )
+    { return t; }
+
+    inline std::string asString( char * t )
     { return t; }
 
     template<class _T>
@@ -128,7 +180,7 @@ namespace zypp
 
     template<>
         inline std::string asString( const bool &t )
-        { return t ? "+" : "-"; }
+        { return t ? "true" : "false"; }
 
     ///////////////////////////////////////////////////////////////////
     /** Printf style construction of std::string. */
@@ -182,8 +234,20 @@ namespace zypp
       operator std::string() const
       { return _str.str(); }
 
+      std::string str() const
+      { return _str.str(); }
+
+      std::ostream & stream()
+      { return _str; }
+
+      void clear()
+      { _str.str( std::string() ); }
+
       std::ostringstream _str;
     };
+
+    inline std::ostream & operator<<( std::ostream & str, const Str & obj )
+    { return str << (std::string)obj; }
 
     ///////////////////////////////////////////////////////////////////
     /** \name String representation of number.
@@ -342,20 +406,46 @@ namespace zypp
     //@}
 
     /**
-     * \short Looks for text in a string and replaces it.
-     *
-     * \note It only perform substtution in one pass
+     * \short Return a string with all occurrences of \c from_r replaced with \c to_r.
      */
-    std::string gsub( const std::string& sData, const std::string& sFrom, const std::string& sTo);
+    std::string gsub( const std::string & str_r, const std::string & from_r, const std::string & to_r );
+
+    /** \overload A function is called on demand to compute each replacement value.
+     */
+    std::string gsubFun( const std::string & str_r, const std::string & from_r, function<std::string()> to_r );
 
     /**
-     * \short Looks for text in string and replaces it in place
-     *
-     *
-     * \note It only perform substtution in one pass
-     * \note use only if you replace same lenght strings, otherwise use gsub
+     * \short Replace all occurrences of \c from_r with \c to_r in \c str_r (inplace).
+     * A reference to \c str_r is also returned for convenience.
      */
-    std::string& replaceAll( std::string & str, const std::string & from, const std::string & to);
+    std::string & replaceAll( std::string & str_r, const std::string & from_r, const std::string & to_r );
+
+    /** \overload A function is called on demand to compute each replacement value.
+     */
+    std::string & replaceAllFun( std::string & str_r, const std::string & from_r, function<std::string()> to_r );
+
+    /** Enhance readability: insert gaps at regular distance
+     * \code
+     *   // no gaps
+     *   Key Fingerprint:  22C07BA534178CD02EFE22AAB88B2FD43DBDC284
+     *   // gapify 8
+     *   Key Fingerprint:  22C07BA5 34178CD0 2EFE22AA B88B2FD4 3DBDC284
+     *   // gapify 4
+     *   Key Fingerprint:  22C0 7BA5 3417 8CD0 2EFE 22AA B88B 2FD4 3DBD C284
+     *   // gapify 4, '-'
+     *   Key Fingerprint:  22C0-7BA5-3417-8CD0-2EFE-22AA-B88B-2FD4-3DBD-C284
+     * \endcode
+     */
+    inline std::string gapify( std::string inp_r, std::string::size_type gap_r = 1, char gapchar = ' ' )
+    {
+      if ( gap_r &&  inp_r.size() > gap_r )
+      {
+	inp_r.reserve( inp_r.size() + (inp_r.size()-1)/gap_r );
+	for ( std::string::size_type pos = gap_r; pos < inp_r.size(); pos += gap_r+1 )
+	  inp_r.insert( pos, 1, gapchar );
+      }
+      return inp_r;
+    }
 
     ///////////////////////////////////////////////////////////////////
     /** \name Split. */
@@ -540,7 +630,8 @@ namespace zypp
 
     /** Split \a line_r into fields.
      * Any single character in \a sepchars_r is treated as a
-     * field separator. The words are passed to OutputIterator
+     * field separator unless \-escaped. The words are passed
+     * to OutputIterator.
      * \a result_r.
      * \code
      * ""        -> words 0
@@ -570,7 +661,11 @@ namespace zypp
           {
             // skip non sepchars
             while( *cur && !::strchr( sepchars_r, *cur ) )
+	    {
+	      if ( *cur == '\\' && *(cur+1) )
+		++cur;
               ++cur;
+	    }
             // build string
             *result_r = std::string( beg, cur-beg );
             ++ret;
@@ -673,18 +768,89 @@ namespace zypp
         }
         return std::string( buf.begin(), buf.end() );
       }
+    //@}
 
 
+    ///////////////////////////////////////////////////////////////////
+    /** \name Indent. */
+    //@{
+      /** Indent by string ["  "] optionally wrap.
+       * Prints nothing for an empty string. Asserts a trainling '\n' on
+       * the last line. Optionally wrap lines at ' ' at a given length.
+       */
+      inline std::ostream & printIndented( std::ostream & str, const std::string & text_r, const std::string & indent_r = "  ", unsigned maxWitdh_r = 0 )
+      {
+	if ( maxWitdh_r )
+	{
+	  if ( indent_r.size() >= maxWitdh_r )
+	    maxWitdh_r = 0;	// nonsense: indent larger than line witdh
+	  else
+	    maxWitdh_r -= indent_r.size();
+	}
+	unsigned width = 0;
+	for ( const char * e = text_r.c_str(), * s = e; *e; s = ++e )
+	{
+	  for ( ; *e && *e != '\n'; ++e ) ;/*searching*/
+	  width = e-s;
+	  if ( maxWitdh_r && width > maxWitdh_r )
+	  {
+	    // must break line
+	    width = maxWitdh_r;
+	    for ( e = s+width; e > s && *e != ' '; --e ) ;/*searching*/
+	    if ( e > s )
+	      width = e-s;	// on a ' ', replaced by '\n'
+	    else
+	      e = s+width-1;	// cut line;
+	  }
+	  str << indent_r;
+	  str.write( s, width );
+	  str << "\n";
+	  if ( !*e )	// on '\0'
+	    break;
+	}
+	return str;
+      }
+      /** \overload Indent by number of chars [' '] optionally wrap. */
+      inline std::ostream & printIndented( std::ostream & str, const std::string & text_r, unsigned indent_r, char indentch_r = ' ', unsigned maxWitdh_r = 0 )
+      { return printIndented( str, text_r, std::string( indent_r, indentch_r ), maxWitdh_r ); }
+      /** \overload Indent by number of chars [' '] wrap. */
+      inline std::ostream & printIndented( std::ostream & str, const std::string & text_r, unsigned indent_r, unsigned maxWitdh_r, char indentch_r = ' ' )
+      { return printIndented( str, text_r, std::string( indent_r, indentch_r ), maxWitdh_r ); }
+
+      /** Prefix lines by string computed by function taking line begin/end [std::string(const char*, const char*)]
+       * Prints nothing for an empty string. Asserts a trainling '\n' on the last line.
+       */
+      inline std::ostream & autoPrefix( std::ostream & str, const std::string & text_r, function<std::string(const char*, const char*)> fnc_r )
+      {
+	for ( const char * e = text_r.c_str(); *e; ++e )
+	{
+	  const char * s = e;
+	  for ( ; *e && *e != '\n'; ++e ) /*searching*/;
+	  str << fnc_r( s, e );
+	  str.write( s, e-s );
+	  str << "\n";
+	  if ( !*e )	// on '\0'
+	    break;
+	}
+	return str;
+      }
+      /** \overload Prefix lines by string generated by function [std::string()] */
+      inline std::ostream & autoPrefix0( std::ostream & str, const std::string & text_r, function<std::string()> fnc_r )
+      {
+	auto wrap = [&fnc_r]( const char*, const char* )-> std::string {
+	  return fnc_r();
+	};
+	return autoPrefix( str, text_r, wrap );
+      }
+    //@}
+    ///////////////////////////////////////////////////////////////////
+    /** \name Escape. */
+    //@{
       /**
        * Escape desired character \a c using a backslash.
        *
        * For use when printing \a c separated values, and where
        * \ref joinEscaped() is too heavy.
-       *
-       * \todo use C_Str instead of std::string to prevent unnecessary
-       * promotion to string if used with "string".
-       *
-       * \todo shoud not be documented in doxy-group 'Join'
        */
       std::string escape( const C_Str & str_r, const char c = ' ' );
 
@@ -776,9 +942,9 @@ namespace zypp
     { return trim( s, R_TRIM ); }
     //@}
 
-    std::string stripFirstWord( std::string & line, const bool ltrim_first );
+    std::string stripFirstWord( std::string & line, const bool ltrim_first = true );
 
-    std::string stripLastWord( std::string & line, const bool rtrim_first );
+    std::string stripLastWord( std::string & line, const bool rtrim_first = true );
 
     /** Return stream content up to (but not returning) the next newline.
      * \see \ref receiveUpTo
@@ -822,6 +988,16 @@ namespace zypp
       if ( hasSuffix( str_r, suffix_r ) )
         return std::string( str_r, str_r.size() - suffix_r.size() );
       return str_r.c_str();
+    }
+    /** Return size of the common prefix of \a lhs and \a rhs. */
+    inline std::string::size_type commonPrefix( const C_Str & lhs, const C_Str & rhs )
+    {
+      const char * lp = lhs.c_str();
+      const char * rp = rhs.c_str();
+      std::string::size_type ret = 0;
+      while ( *lp == *rp && *lp != '\0' )
+      { ++lp, ++rp, ++ret; }
+      return ret;
     }
 
     /** alias for \ref hasPrefix */

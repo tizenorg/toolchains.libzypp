@@ -10,13 +10,13 @@ using std::stringstream;
 using std::string;
 using namespace zypp;
 
-static string service = "<repoindex>"
+static string service = "<repoindex arch=\"i386\" distver=\"11\">"
   "<repo alias=\"company-foo\" name=\"Company's Foo\""
-  "      path=\"products/foo\" distro_target=\"sle-11-i386\" priority=\"20\"/>"
+  "      path=\"products/foo\" distro_target=\"sle-%{distver}-%{arch}\" priority=\"20\"/>"
   "<repo alias=\"company-bar\" name=\"Company's Bar\""
-  "      path=\"products/bar\" distro_target=\"sle-11-i386\" enabled=\"true\"/>"
+  "      path=\"products/bar\" distro_target=\"sle-%{distver}-%{arch}\" enabled=\"tRUe\" autorefresh=\"FaLsE\"/>"
   "<repo alias=\"company-foo-upd\" name=\"Company's Foo Updates\""
-  "      path=\"products/foo/updates\" distro_target=\"sle-11-i386\" priority=\"1\"/>"
+  "      path=\"products/foo/updates\" distro_target=\"sle-%{distver}-%{arch}\" priority=\"1\"/>"
   "</repoindex>";
 
 struct RepoCollector : private base::NonCopyable
@@ -61,6 +61,8 @@ BOOST_AUTO_TEST_CASE(read_index_file)
     BOOST_CHECK_EQUAL(99, repo.priority());
     // "Repository is explicitly enabled"
     BOOST_CHECK(repo.enabled());
+    // "Repository autorefresh is explicitly disabled"
+    BOOST_CHECK(!repo.autorefresh());
 
 
   }

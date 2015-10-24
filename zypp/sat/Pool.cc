@@ -45,14 +45,25 @@ namespace zypp
     void Pool::prepare() const
     { return myPool().prepare(); }
 
+    void Pool::prepareForSolving() const
+    { return myPool().prepareForSolving(); }
+
     bool Pool::reposEmpty() const
-    { return ! myPool()->nrepos; }
+    { return ! myPool()->urepos; }
 
     Pool::size_type Pool::reposSize() const
-    { return myPool()->nrepos; }
+    { return myPool()->urepos; }
 
     Pool::RepositoryIterator Pool::reposBegin() const
-    { return RepositoryIterator( myPool()->repos ); }
+    {
+      if ( myPool()->urepos )
+      { // repos[0] == NULL
+	for_( it, myPool()->repos+1, myPool()->repos+myPool()->nrepos )
+	  if ( *it )
+	    return RepositoryIterator( it );
+      }
+      return reposEnd();
+    }
 
     Pool::RepositoryIterator Pool::reposEnd() const
     { return RepositoryIterator( myPool()->repos+myPool()->nrepos ); }
@@ -209,11 +220,8 @@ namespace zypp
     Pool::MultiversionIterator Pool::multiversionEnd() const	{ return myPool().multiversionList().end(); }
     bool Pool::isMultiversion( IdString ident_r ) const		{ return myPool().isMultiversion( ident_r ); }
 
-    bool Pool::onSystemByUserEmpty() const			{ return myPool().onSystemByUserList().empty(); }
-    size_t Pool::onSystemByUserSize() const			{ return myPool().onSystemByUserList().size(); }
-    Pool::OnSystemByUserIterator Pool::onSystemByUserBegin() const	{ return myPool().onSystemByUserList().begin(); }
-    Pool::OnSystemByUserIterator Pool::onSystemByUserEnd() const	{ return myPool().onSystemByUserList().end(); }
-    bool Pool::isOnSystemByUser( IdString ident_r ) const	{ return myPool().isOnSystemByUser( ident_r ); }
+    Queue Pool::autoInstalled() const				{ return myPool().autoInstalled(); }
+    void Pool::setAutoInstalled( const Queue & autoInstalled_r ){ myPool().setAutoInstalled( autoInstalled_r ); }
 
    /******************************************************************
     **

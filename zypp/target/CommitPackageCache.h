@@ -29,6 +29,27 @@ namespace zypp
   { /////////////////////////////////////////////////////////////////
 
     ///////////////////////////////////////////////////////////////////
+    /// \class RepoProvidePackage
+    /// \short Default PackageProvider for \ref CommitPackageCache
+    ///
+    /// \p pool_r \ref ResPool used to get candidates
+    /// \p pi item to be commited
+    ///////////////////////////////////////////////////////////////////
+    class RepoProvidePackage
+    {
+    public:
+      RepoProvidePackage();
+      ~RepoProvidePackage();
+
+      /** Provide package optionally fron cache only. */
+      ManagedFile operator()( const PoolItem & pi, bool fromCache_r );
+
+    private:
+      struct Impl;
+      RW_pointer<Impl> _impl;
+    };
+
+    ///////////////////////////////////////////////////////////////////
     //
     //	CLASS NAME : CommitPackageCache
     //
@@ -39,12 +60,12 @@ namespace zypp
       friend std::ostream & operator<<( std::ostream & str, const CommitPackageCache & obj );
 
     public:
-      typedef function<ManagedFile( const PoolItem & pi )> PackageProvider;
+      typedef function<ManagedFile( const PoolItem & pi, bool fromCache_r )> PackageProvider;
 
     public:
       /** Ctor */
       CommitPackageCache( const Pathname &        rootDir_r,
-                          const PackageProvider & packageProvider_r );
+                          const PackageProvider & packageProvider_r = RepoProvidePackage() );
 
       /** Dtor */
       ~CommitPackageCache();
@@ -59,6 +80,17 @@ namespace zypp
 
       /** Provide a package. */
       ManagedFile get( const PoolItem & citem_r );
+      /** \overload */
+      ManagedFile get( sat::Solvable citem_r )
+      { return get( PoolItem(citem_r) ); }
+
+      /** Whether preloaded hint is set.
+       * If preloaded the cache tries to avoid trigering the infoInCache CB,
+       * based on the assumption this was already done when preloading the cache.
+       */
+      bool preloaded() const;
+      /** Set preloaded hint. */
+      void preloaded( bool newval_r );
 
     public:
       /** Implementation. */

@@ -17,7 +17,6 @@
 #include <map>
 
 #include "zypp/base/PtrTypes.h"
-#include "zypp/base/SafeBool.h"
 
 #include "zypp/PluginFrameException.h"
 
@@ -38,16 +37,20 @@ namespace zypp
    *
    * \see PluginScript
    */
-  class PluginFrame : private base::SafeBool<PluginFrame>
+  class PluginFrame
   {
     friend std::ostream & operator<<( std::ostream & str, const PluginFrame & obj );
     friend bool operator==( const PluginFrame & lhs, const PluginFrame & rhs );
+
+    typedef const std::initializer_list<std::pair<std::string,std::string>> & HeaderInitializerList;
 
     public:
       /** "ACK" command. */
       static const std::string & ackCommand();
       /** "ERROR" command. */
       static const std::string & errorCommand();
+      /** "_ENOMETHOD" command. */
+      static const std::string & enomethodCommand();
 
     public:
       /** Default exception type */
@@ -64,7 +67,17 @@ namespace zypp
       /** Ctor taking command and body
        * \throw PluginFrameException If \ref setCommand throws
        */
-      PluginFrame( const std::string & command_r, const std::string body_r );
+      PluginFrame( const std::string & command_r, const std::string & body_r );
+
+      /** Ctor taking the command and a HeaderInitializerList
+       * \throw PluginFrameException If \ref setCommand throws
+       */
+      PluginFrame( const std::string & command_r, HeaderInitializerList contents_r );
+
+      /** Ctor taking command, body and a HeaderInitializerList
+       * \throw PluginFrameException If \ref setCommand throws
+       */
+      PluginFrame( const std::string & command_r, const std::string & body_r, HeaderInitializerList contents_r );
 
       /** Ctor reading frame data from a stream
        * \throw PluginFrameException On error reading from stream
@@ -77,7 +90,8 @@ namespace zypp
       bool empty() const;
 
       /** Evaluate in a boolean context (empty frame) */
-      using base::SafeBool<PluginFrame>::operator bool_type;
+      explicit operator bool() const
+      { return empty(); }
 
     public:
       /** Return the frame command. */
@@ -95,6 +109,10 @@ namespace zypp
       /** Convenience to identify an ERROR command. */
       bool isErrorCommand() const
       {return command() == errorCommand(); }
+
+      /** Convenience to identify an _ENOMETHOD command. */
+      bool isEnomethodCommand() const
+      {return command() == enomethodCommand(); }
 
       /** Return the frame body. */
       const std::string & body() const;
@@ -150,7 +168,7 @@ namespace zypp
 
       /** Whether the header list contains at least one entry for \c key_r. */
       bool hasKey( const std::string & key_r ) const
-      { return keyEmpty( key_r ); }
+      { return ! keyEmpty( key_r ); }
 
       /** \overload */
       bool keyEmpty( const std::string & key_r ) const
@@ -189,11 +207,20 @@ namespace zypp
        */
       void setHeader( const std::string & key_r, const std::string & value_r = std::string() );
 
+      /** Set a new header list
+       * \throw PluginFrameException If key contains illegal chars (\c NL or \c :)
+       * \throw PluginFrameException If value contains illegal chars (\c NL)
+       */
+      void setHeader( HeaderInitializerList contents_r )
+      { headerList().clear(); addHeader( contents_r ); }
+
       /** Add header for \c key_r leaving already existing headers for \c key_r unchanged.
        * \throw PluginFrameException If key contains illegal chars (\c NL or \c :)
        * \throw PluginFrameException If value contains illegal chars (\c NL)
        */
       void addHeader( const std::string & key_r, const std::string & value_r = std::string() );
+      /** \overload taking an initializer_list */
+      void addHeader( HeaderInitializerList contents_r );
 
       /** Remove all headers for \c key_r. */
       void clearHeader( const std::string & key_r );
@@ -218,11 +245,6 @@ namespace zypp
       static std::istream & readFrom( std::istream & stream_r, PluginFrame & frame_r )
       { frame_r = PluginFrame( stream_r ); return stream_r; }
 
-    private:
-      friend base::SafeBool<PluginFrame>::operator bool_type() const;
-      /** Evaluate in a boolean context */
-      bool boolTest() const
-      { return empty(); }
     public:
       /** Implementation */
       class Impl;

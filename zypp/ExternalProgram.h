@@ -13,6 +13,8 @@
 #ifndef ZYPP_EXTERNALPROGRAM_H
 #define ZYPP_EXTERNALPROGRAM_H
 
+#include <unistd.h>
+
 #include <map>
 #include <string>
 #include <vector>
@@ -83,7 +85,7 @@ namespace zypp {
        * @param commandline a shell commandline that is appended to
        * <tt>/bin/sh -c</tt>.
        * @param default_locale whether to set LC_ALL=C before starting
-       * @param root directory to chroot into, / or empty to not chroot
+       * @param root directory to chroot into; or just 'cd' if '/'l;  nothing if empty
        */
       ExternalProgram (std::string commandline,
     		     Stderr_Disposition stderr_disp = Normal_Stderr,
@@ -94,6 +96,9 @@ namespace zypp {
        * Start an external program by giving the arguments as an arry of char *pointers.
        * If environment is provided, varaiables will be added to the childs environment,
        * overwriting existing ones.
+       *
+       * Initial args starting with \c # are discarded but some are treated specially:
+       * 	#/[path] - chdir to /[path] before executing
        *
        * Stdin redirection: If the \b 1st argument starts with a \b '<', the remaining
        * part is treated as file opened for reading on standard input (or \c /dev/null
@@ -260,7 +265,7 @@ namespace zypp {
 
     public:
       /** Return \c FILE* to read programms stderr (O_NONBLOCK set). */
-      _ExternalProgram::EarlyPipe::stderr;
+      using _ExternalProgram::EarlyPipe::stderr;
 
       /** Read data up to \c delim_r from stderr (nonblocking).
        * \note If \c delim_r is '\0', we read as much data as possible.

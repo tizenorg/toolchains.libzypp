@@ -26,6 +26,7 @@
 #include "zypp/base/IOStream.h"
 #include "zypp/base/Functional.h"
 #include "zypp/base/UserRequestException.h"
+#include "zypp/base/Json.h"
 
 #include "zypp/ZConfig.h"
 #include "zypp/ZYppFactory.h"
@@ -44,14 +45,12 @@
 #include "zypp/target/TargetCallbackReceiver.h"
 #include "zypp/target/rpm/librpmDb.h"
 #include "zypp/target/CommitPackageCache.h"
+#include "zypp/target/RpmPostTransCollector.h"
 
 #include "zypp/parser/ProductFileReader.h"
 
-#include "zypp/pool/GetResolvablesToInsDel.h"
 #include "zypp/solver/detail/Testcase.h"
 
-#include "zypp/repo/DeltaCandidates.h"
-#include "zypp/repo/PackageProvider.h"
 #include "zypp/repo/SrcPackageProvider.h"
 
 #include "zypp/sat/Pool.h"
@@ -65,16 +64,167 @@ using namespace std;
 namespace zypp
 { /////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////
+  namespace json
+  {
+    // Lazy via template specialisation / should switch to overloading
+
+    template<>
+    inline std::string toJSON( const ZYppCommitResult::TransactionStepList & steps_r )
+    {
+      using sat::Transaction;
+      json::Array ret;
+
+      for ( const Transaction::Step & step : steps_r )
+	// ignore implicit deletes due to obsoletes and non-package actions
+	if ( step.stepType() != Transaction::TRANSACTION_IGNORE )
+	  ret.add( step );
+
+      return ret.asJSON();
+    }
+
+    /** See \ref commitbegin on page \ref plugin-commit for the specs. */
+    template<>
+    inline std::string toJSON( const sat::Transaction::Step & step_r )
+    {
+      static const std::string strType( "type" );
+      static const std::string strStage( "stage" );
+      static const std::string strSolvable( "solvable" );
+
+      static const std::string strTypeDel( "-" );
+      static const std::string strTypeIns( "+" );
+      static const std::string strTypeMul( "M" );
+
+      static const std::string strStageDone( "ok" );
+      static const std::string strStageFailed( "err" );
+
+      static const std::string strSolvableN( "n" );
+      static const std::string strSolvableE( "e" );
+      static const std::string strSolvableV( "v" );
+      static const std::string strSolvableR( "r" );
+      static const std::string strSolvableA( "a" );
+
+      using sat::Transaction;
+      json::Object ret;
+
+      switch ( step_r.stepType() )
+      {
+	case Transaction::TRANSACTION_IGNORE:	/*empty*/ break;
+	case Transaction::TRANSACTION_ERASE:	ret.add( strType, strTypeDel ); break;
+	case Transaction::TRANSACTION_INSTALL:	ret.add( strType, strTypeIns ); break;
+	case Transaction::TRANSACTION_MULTIINSTALL: ret.add( strType, strTypeMul ); break;
+      }
+
+      switch ( step_r.stepStage() )
+      {
+	case Transaction::STEP_TODO:		/*empty*/ break;
+	case Transaction::STEP_DONE:		ret.add( strStage, strStageDone ); break;
+	case Transaction::STEP_ERROR:		ret.add( strStage, strStageFailed ); break;
+      }
+
+      {
+	IdString ident;
+	Edition ed;
+	Arch arch;
+	if ( sat::Solvable solv = step_r.satSolvable() )
+	{
+	  ident	= solv.ident();
+	  ed	= solv.edition();
+	  arch	= solv.arch();
+	}
+	else
+	{
+	  // deleted package; post mortem data stored in Transaction::Step
+	  ident	= step_r.ident();
+	  ed	= step_r.edition();
+	  arch	= step_r.arch();
+	}
+
+	json::Object s {
+	  { strSolvableN, ident.asString() },
+	  { strSolvableV, ed.version() },
+	  { strSolvableR, ed.release() },
+	  { strSolvableA, arch.asString() }
+	};
+	if ( Edition::epoch_t epoch = ed.epoch() )
+	  s.add( strSolvableE, epoch );
+
+	ret.add( strSolvable, s );
+      }
+
+      return ret.asJSON();
+    }
+  } // namespace json
+  ///////////////////////////////////////////////////////////////////
+
+  ///////////////////////////////////////////////////////////////////
   namespace target
-  { /////////////////////////////////////////////////////////////////
+  {
+    ///////////////////////////////////////////////////////////////////
+    namespace
+    {
+      SolvIdentFile::Data getUserInstalledFromHistory( const Pathname & historyFile_r )
+      {
+	SolvIdentFile::Data onSystemByUserList;
+	// go and parse it: 'who' must constain an '@', then it was installed by user request.
+	// 2009-09-29 07:25:19|install|lirc-remotes|0.8.5-3.2|x86_64|root@opensuse|InstallationImage|a204211eb0...
+	std::ifstream infile( historyFile_r.c_str() );
+	for( iostr::EachLine in( infile ); in; in.next() )
+	{
+	  const char * ch( (*in).c_str() );
+	  // start with year
+	  if ( *ch < '1' || '9' < *ch )
+	    continue;
+	  const char * sep1 = ::strchr( ch, '|' );	// | after date
+	  if ( !sep1 )
+	    continue;
+	  ++sep1;
+	  // if logs an install or delete
+	  bool installs = true;
+	  if ( ::strncmp( sep1, "install|", 8 ) )
+	  {
+	    if ( ::strncmp( sep1, "remove |", 8 ) )
+	      continue; // no install and no remove
+	      else
+		installs = false; // remove
+	  }
+	  sep1 += 8;					// | after what
+	  // get the package name
+	  const char * sep2 = ::strchr( sep1, '|' );	// | after name
+	  if ( !sep2 || sep1 == sep2 )
+	    continue;
+	  (*in)[sep2-ch] = '\0';
+	  IdString pkg( sep1 );
+	  // we're done, if a delete
+	  if ( !installs )
+	  {
+	    onSystemByUserList.erase( pkg );
+	    continue;
+	  }
+	  // now guess whether user installed or not (3rd next field contains 'user@host')
+	  if ( (sep1 = ::strchr( sep2+1, '|' ))		// | after version
+	    && (sep1 = ::strchr( sep1+1, '|' ))		// | after arch
+	    && (sep2 = ::strchr( sep1+1, '|' )) )	// | after who
+	  {
+	    (*in)[sep2-ch] = '\0';
+	    if ( ::strchr( sep1+1, '@' ) )
+	    {
+	      // by user
+	      onSystemByUserList.insert( pkg );
+	      continue;
+	    }
+	  }
+	}
+	MIL << "onSystemByUserList found: " << onSystemByUserList.size() << endl;
+	return onSystemByUserList;
+      }
+    } // namespace
+    ///////////////////////////////////////////////////////////////////
 
     /** Helper for commit plugin execution.
      * \ingroup g_RAII
      */
     class CommitPlugins : private base::NonCopyable
     {
-      public:
-
       public:
 	/** Default ctor: Empty plugin list */
 	CommitPlugins()
@@ -83,24 +233,31 @@ namespace zypp
 	/** Dtor: Send PLUGINEND message and close plugins. */
 	~CommitPlugins()
 	{
-	  for_( it, _scripts.begin(), _scripts.end() )
+	  if ( ! _scripts.empty() )
+	    send( PluginFrame( "PLUGINEND" ) );
+	  // ~PluginScript will disconnect all remaining plugins!
+	}
+
+	/** Whether no plugins are waiting */
+	bool empty() const
+	{ return _scripts.empty(); }
+
+
+	/** Send \ref PluginFrame to all open plugins.
+	 * Failed plugins are removed from the execution list.
+	 */
+	void send( const PluginFrame & frame_r )
+	{
+	  DBG << "+++++++++++++++ send " << frame_r << endl;
+	  for ( auto it = _scripts.begin(); it != _scripts.end(); )
 	  {
-	    MIL << "Unload plugin: " << *it << endl;
-	    try {
-	      it->send( PluginFrame( "PLUGINEND" ) );
-	      PluginFrame ret( it->receive() );
-	      if ( ! ret.isAckCommand() )
-	      {
-		WAR << "Failed to unload plugin: Bad plugin response." << endl;
-	      }
-	      it->close();
-	    }
-	    catch( const zypp::Exception &  )
-	    {
-	      WAR << "Failed to unload plugin." << endl;
-	    }
+	    doSend( *it, frame_r );
+	    if ( it->isOpen() )
+	      ++it;
+	    else
+	      it = _scripts.erase( it );
 	  }
-	  // _scripts dtor will disconnect all remaining plugins!
+	  DBG << "--------------- send " << frame_r << endl;
 	}
 
 	/** Find and launch plugins sending PLUGINSTART message.
@@ -112,6 +269,7 @@ namespace zypp
 	void load( const Pathname & path_r )
 	{
 	  PathInfo pi( path_r );
+	  DBG << "+++++++++++++++ load " << pi << endl;
 	  if ( pi.isDir() )
 	  {
 	    std::list<Pathname> entries;
@@ -138,29 +296,55 @@ namespace zypp
 	  {
 	    WAR << "Plugin path is neither dir nor file: " << pi << endl;
 	  }
+	  DBG << "--------------- load " << pi << endl;
 	}
 
       private:
+	/** Send \ref PluginFrame and expect valid answer (ACK|_ENOMETHOD).
+	 * Upon invalid answer or error, close the plugin. and remove it from the
+	 * execution list.
+	 * \returns the received \ref PluginFrame (empty Frame upon Exception)
+	 */
+	PluginFrame doSend( PluginScript & script_r, const PluginFrame & frame_r )
+	{
+	  PluginFrame ret;
+
+	  try {
+	    script_r.send( frame_r );
+	    ret = script_r.receive();
+	  }
+	  catch( const zypp::Exception & e )
+	  { ZYPP_CAUGHT(e); }
+
+	  if ( ! ( ret.isAckCommand() || ret.isEnomethodCommand() ) )
+	  {
+	    WAR << "Bad plugin response from " << script_r << endl;
+	    WAR << dump(ret) << endl;
+	    script_r.close();
+	  }
+
+	  return ret;
+	}
+
+	/** Launch a plugin sending PLUGINSTART message. */
 	void doLoad( const PathInfo & pi_r )
 	{
 	  MIL << "Load plugin: " << pi_r << endl;
 	  try {
 	    PluginScript plugin( pi_r.path() );
 	    plugin.open();
-	    plugin.send( PluginFrame( "PLUGINBEGIN" ) );
-	    PluginFrame ret( plugin.receive() );
-	    if ( ret.isAckCommand() )
-	    {
+
+	    PluginFrame frame( "PLUGINBEGIN" );
+	    if ( ZConfig::instance().hasUserData() )
+	      frame.setHeader( "userdata", ZConfig::instance().userData() );
+
+	    doSend( plugin, frame );	// closes on error
+	    if ( plugin.isOpen() )
 	      _scripts.push_back( plugin );
-	    }
-	    else
-	    {
-	      WAR << "Failed to load plugin: Bad plugin response." << endl;
-	    }
 	  }
-	  catch( const zypp::Exception &  )
+	  catch( const zypp::Exception & e )
 	  {
-	     WAR << "Failed to load plugin." << endl;
+	     WAR << "Failed to load plugin " << pi_r << endl;
 	  }
 	}
 
@@ -179,6 +363,16 @@ namespace zypp
       USR << "-----" << endl;
     }
 
+    ///////////////////////////////////////////////////////////////////
+    namespace
+    {
+      inline PluginFrame transactionPluginFrame( const std::string & command_r, ZYppCommitResult::TransactionStepList & steps_r )
+      {
+	return PluginFrame( command_r, json::Object {
+	  { "TransactionStepList", steps_r }
+	}.asJSON() );
+      }
+    } // namespace
     ///////////////////////////////////////////////////////////////////
 
     /** \internal Manage writing a new testcase when doing an upgrade. */
@@ -341,6 +535,7 @@ namespace zypp
         // - "name-version-release"
         // - "name-version-release-*"
         bool abort = false;
+	std::map<std::string, Pathname> unify; // scripts <md5,path>
         for_( it, checkPackages_r.begin(), checkPackages_r.end() )
         {
           std::string prefix( str::form( "%s-%s", it->name().c_str(), it->edition().c_str() ) );
@@ -353,13 +548,42 @@ namespace zypp
               continue; // if not exact match it had to continue with '-'
 
             PathInfo script( scriptsDir / *sit );
-            if ( ! script.isFile() )
-              continue;
+            Pathname localPath( scriptsPath_r/(*sit) );	// without root prefix
+            std::string unifytag;			// must not stay empty
 
-            // Assert it's set executable
-            filesystem::addmod( script.path(), 0500 );
+	    if ( script.isFile() )
+	    {
+	      // Assert it's set executable, unify by md5sum.
+	      filesystem::addmod( script.path(), 0500 );
+	      unifytag = filesystem::md5sum( script.path() );
+	    }
+	    else if ( ! script.isExist() )
+	    {
+	      // Might be a dangling symlink, might be ok if we are in
+	      // instsys (absolute symlink within the system below /mnt).
+	      // readlink will tell....
+	      unifytag = filesystem::readlink( script.path() ).asString();
+	    }
 
-            Pathname localPath( scriptsPath_r/(*sit) ); // without root prefix
+	    if ( unifytag.empty() )
+	      continue;
+
+	    // Unify scripts
+	    if ( unify[unifytag].empty() )
+	    {
+	      unify[unifytag] = localPath;
+	    }
+	    else
+	    {
+	      // translators: We may find the same script content in files with different names.
+	      // Only the first occurence is executed, subsequent ones are skipped. It's a one-line
+	      // message for a log file. Preferably start translation with "%s"
+	      std::string msg( str::form(_("%s already executed as %s)"), localPath.asString().c_str(), unify[unifytag].c_str() ) );
+              MIL << "Skip update script: " << msg << endl;
+              HistoryLog().comment( msg, /*timestamp*/true );
+	      continue;
+	    }
+
             if ( abort || aborting_r )
             {
               WAR << "Aborting: Skip update script " << *sit << endl;
@@ -579,59 +803,6 @@ namespace zypp
                              ZYppCommitResult & result_r )
     { RunUpdateMessages( root_r, messagesPath_r, checkPackages_r, result_r ); }
 
-    /** Helper for PackageProvider queries during commit. */
-    struct QueryInstalledEditionHelper
-    {
-      bool operator()( const std::string & name_r,
-                       const Edition &     ed_r,
-                       const Arch &        arch_r ) const
-      {
-        rpm::librpmDb::db_const_iterator it;
-        for ( it.findByName( name_r ); *it; ++it )
-          {
-            if ( arch_r == it->tag_arch()
-                 && ( ed_r == Edition::noedition || ed_r == it->tag_edition() ) )
-              {
-                return true;
-              }
-          }
-        return false;
-      }
-    };
-
-    /**
-     * \short Let the Source provide the package.
-     * \p pool_r \ref ResPool used to get candidates
-     * \p pi item to be commited
-    */
-    struct RepoProvidePackage
-    {
-      ResPool _pool;
-      repo::RepoMediaAccess &_access;
-
-      RepoProvidePackage( repo::RepoMediaAccess &access, ResPool pool_r )
-        : _pool(pool_r), _access(access)
-      {}
-
-      ManagedFile operator()( const PoolItem & pi )
-      {
-        // Redirect PackageProvider queries for installed editions
-        // (in case of patch/delta rpm processing) to rpmDb.
-        repo::PackageProviderPolicy packageProviderPolicy;
-        packageProviderPolicy.queryInstalledCB( QueryInstalledEditionHelper() );
-
-        Package::constPtr p = asKind<Package>(pi.resolvable());
-
-        // Build a repository list for repos
-        // contributing to the pool
-        std::list<Repository> repos( _pool.knownRepositoriesBegin(), _pool.knownRepositoriesEnd() );
-        repo::DeltaCandidates deltas(repos, p->name());
-        repo::PackageProvider pkgProvider( _access, p, deltas, packageProviderPolicy );
-
-        ManagedFile ret( pkgProvider.providePackage() );
-        return ret;
-      }
-    };
     ///////////////////////////////////////////////////////////////////
 
     IMPL_PTR_TYPE(TargetImpl);
@@ -654,7 +825,7 @@ namespace zypp
     TargetImpl::TargetImpl( const Pathname & root_r, bool doRebuild_r )
     : _root( root_r )
     , _requestedLocalesFile( home() / "RequestedLocales" )
-    , _softLocksFile( home() / "SoftLocks" )
+    , _autoInstalledFile( home() / "AutoInstalled" )
     , _hardLocksFile( Pathname::assertprefix( _root, ZConfig::instance().locksFile() ) )
     {
       _rpm.initDatabase( root_r, Pathname(), doRebuild_r );
@@ -669,29 +840,10 @@ namespace zypp
     /**
      * generates a random id using uuidgen
      */
-    static string generateRandomId()
+    static std::string generateRandomId()
     {
-      string id;
-      const char* argv[] =
-      {
-         "/usr/bin/uuidgen",
-         NULL
-      };
-
-      ExternalProgram prog( argv,
-                            ExternalProgram::Normal_Stderr,
-                            false, -1, true);
-      std::string line;
-      for(line = prog.receiveLine();
-          ! line.empty();
-          line = prog.receiveLine() )
-      {
-          MIL << line << endl;
-          id = line;
-          break;
-      }
-      prog.close();
-      return id;
+      std::ifstream uuidprovider( "/proc/sys/kernel/random/uuid" );
+      return iostr::getline( uuidprovider );
     }
 
     /**
@@ -818,7 +970,7 @@ namespace zypp
       filesystem::recursive_rmdir( base );
     }
 
-    void TargetImpl::buildCache()
+    bool TargetImpl::buildCache()
     {
       Pathname base = solvfilesPath();
       Pathname rpmsolv       = base/"solv";
@@ -827,8 +979,7 @@ namespace zypp
       bool build_rpm_solv = true;
       // lets see if the rpm solv cache exists
 
-      RepoStatus rpmstatus( RepoStatus( _root/"/var/lib/rpm/Name" )
-                            && (_root/"/etc/products.d") );
+      RepoStatus rpmstatus( RepoStatus(_root/"var/lib/rpm/Name") && RepoStatus(_root/"etc/products.d") );
 
       bool solvexisted = PathInfo(rpmsolv).isExist();
       if ( solvexisted )
@@ -840,10 +991,10 @@ namespace zypp
         {
           RepoStatus status = RepoStatus::fromCookieFile(rpmsolvcookie);
           // now compare it with the rpm database
-          if ( status.checksum() == rpmstatus.checksum() )
-            build_rpm_solv = false;
-          MIL << "Read cookie: " << rpmsolvcookie << " says: "
-              << (build_rpm_solv ? "outdated" : "uptodate") << endl;
+          if ( status == rpmstatus )
+	    build_rpm_solv = false;
+	  MIL << "Read cookie: " << rpmsolvcookie << " says: "
+	  << (build_rpm_solv ? "outdated" : "uptodate") << endl;
         }
       }
 
@@ -899,7 +1050,8 @@ namespace zypp
         cmd << "rpmdb2solv";
         if ( ! _root.empty() )
           cmd << " -r '" << _root << "'";
-
+	cmd << " -X";	// autogenerate pattern/product/... from -package
+	cmd << " -A";	// autogenerate application pseudo packages
         cmd << " -p '" << Pathname::assertprefix( _root, "/etc/products.d" ) << "'";
 
         if ( ! oldSolvFile.empty() )
@@ -958,6 +1110,12 @@ namespace zypp
 	    }
 	}
       }
+      return build_rpm_solv;
+    }
+
+    void TargetImpl::reload()
+    {
+        load( false );
     }
 
     void TargetImpl::unload()
@@ -967,10 +1125,11 @@ namespace zypp
         system.eraseFromPool();
     }
 
-
-    void TargetImpl::load()
+    void TargetImpl::load( bool force )
     {
-      buildCache();
+      bool newCache = buildCache();
+      MIL << "New cache built: " << (newCache?"true":"false") <<
+        ", force loading: " << (force?"true":"false") << endl;
 
       // now add the repos to the pool
       sat::Pool satpool( sat::Pool::instance() );
@@ -979,10 +1138,19 @@ namespace zypp
 
       // Providing an empty system repo, unload any old content
       Repository system( sat::Pool::instance().findSystemRepo() );
+
       if ( system && ! system.solvablesEmpty() )
       {
-        system.eraseFromPool(); // invalidates system
+        if ( newCache || force )
+        {
+          system.eraseFromPool(); // invalidates system
+        }
+        else
+        {
+          return;     // nothing to do
+        }
       }
+
       if ( ! system )
       {
         system = satpool.systemRepo();
@@ -990,6 +1158,7 @@ namespace zypp
 
       try
       {
+        MIL << "adding " << rpmsolv << " to system" << endl;
         system.addSolv( rpmsolv );
       }
       catch ( const Exception & exp )
@@ -1015,16 +1184,30 @@ namespace zypp
         }
       }
       {
-        SoftLocksFile::Data softLocks( _softLocksFile.data() );
-        if ( ! softLocks.empty() )
-        {
-          // Don't soft lock any installed item.
-          for_( it, system.solvablesBegin(), system.solvablesEnd() )
-          {
-            softLocks.erase( it->ident() );
-          }
-          ResPool::instance().setAutoSoftLocks( softLocks );
-        }
+	if ( ! PathInfo( _autoInstalledFile.file() ).isExist() )
+	{
+	  // Initialize from history, if it does not exist
+	  Pathname historyFile( Pathname::assertprefix( _root, ZConfig::instance().historyLogFile() ) );
+	  if ( PathInfo( historyFile ).isExist() )
+	  {
+	    SolvIdentFile::Data onSystemByUser( getUserInstalledFromHistory( historyFile ) );
+	    SolvIdentFile::Data onSystemByAuto;
+	    for_( it, system.solvablesBegin(), system.solvablesEnd() )
+	    {
+	      IdString ident( (*it).ident() );
+	      if ( onSystemByUser.find( ident ) == onSystemByUser.end() )
+		onSystemByAuto.insert( ident );
+	    }
+	    _autoInstalledFile.setData( onSystemByAuto );
+	  }
+	  // on the fly removed any obsolete SoftLocks file
+	  filesystem::unlink( home() / "SoftLocks" );
+	}
+	// read from AutoInstalled file
+	sat::StringQueue q;
+	for ( const auto & idstr : _autoInstalledFile.data() )
+	  q.push( idstr.id() );
+	satpool.setAutoInstalled( q );
       }
       if ( ZConfig::instance().apply_locks_file() )
       {
@@ -1070,58 +1253,6 @@ namespace zypp
       MIL << "TargetImpl::commit(<pool>, " << policy_r << ")" << endl;
 
       ///////////////////////////////////////////////////////////////////
-      // Prepare execution of commit plugins:
-      ///////////////////////////////////////////////////////////////////
-      CommitPlugins commitPlugins;
-      if ( root() == "/" && ! policy_r.dryRun() )
-      {
-	Pathname plugindir( Pathname::assertprefix( _root, ZConfig::instance().pluginsPath()/"commit" ) );
-	commitPlugins.load( plugindir );
-      }
-
-      ///////////////////////////////////////////////////////////////////
-      // Write out a testcase if we're in dist upgrade mode.
-      ///////////////////////////////////////////////////////////////////
-      if ( getZYpp()->resolver()->upgradeMode() )
-      {
-        if ( ! policy_r.dryRun() )
-        {
-          writeUpgradeTestcase();
-        }
-        else
-        {
-          DBG << "dryRun: Not writing upgrade testcase." << endl;
-        }
-      }
-
-      ///////////////////////////////////////////////////////////////////
-      // Store non-package data:
-      ///////////////////////////////////////////////////////////////////
-      if ( ! policy_r.dryRun() )
-      {
-        filesystem::assert_dir( home() );
-        // requested locales
-        _requestedLocalesFile.setLocales( pool_r.getRequestedLocales() );
-        // weak locks
-        {
-          SoftLocksFile::Data newdata;
-          pool_r.getActiveSoftLocks( newdata );
-          _softLocksFile.setData( newdata );
-        }
-        // hard locks
-        if ( ZConfig::instance().apply_locks_file() )
-        {
-          HardLocksFile::Data newdata;
-          pool_r.getHardLockQueries( newdata );
-          _hardLocksFile.setData( newdata );
-        }
-      }
-      else
-      {
-        DBG << "dryRun: Not stroring non-package data." << endl;
-      }
-
-      ///////////////////////////////////////////////////////////////////
       // Compute transaction:
       ///////////////////////////////////////////////////////////////////
       ZYppCommitResult result( root() );
@@ -1146,6 +1277,61 @@ namespace zypp
 	result.rTransactionStepList().insert( steps.end(), result.transaction().begin(), result.transaction().end() );
       }
       MIL << "Todo: " << result << endl;
+
+      ///////////////////////////////////////////////////////////////////
+      // Prepare execution of commit plugins:
+      ///////////////////////////////////////////////////////////////////
+      CommitPlugins commitPlugins;
+      if ( root() == "/" && ! policy_r.dryRun() )
+      {
+	Pathname plugindir( Pathname::assertprefix( _root, ZConfig::instance().pluginsPath()/"commit" ) );
+	commitPlugins.load( plugindir );
+      }
+      if ( ! commitPlugins.empty() )
+	commitPlugins.send( transactionPluginFrame( "COMMITBEGIN", steps ) );
+
+      ///////////////////////////////////////////////////////////////////
+      // Write out a testcase if we're in dist upgrade mode.
+      ///////////////////////////////////////////////////////////////////
+      if ( getZYpp()->resolver()->upgradeMode() )
+      {
+        if ( ! policy_r.dryRun() )
+        {
+          writeUpgradeTestcase();
+        }
+        else
+        {
+          DBG << "dryRun: Not writing upgrade testcase." << endl;
+        }
+      }
+
+     ///////////////////////////////////////////////////////////////////
+      // Store non-package data:
+      ///////////////////////////////////////////////////////////////////
+      if ( ! policy_r.dryRun() )
+      {
+        filesystem::assert_dir( home() );
+        // requested locales
+        _requestedLocalesFile.setLocales( pool_r.getRequestedLocales() );
+	// autoinstalled
+        {
+	  SolvIdentFile::Data newdata;
+	  for ( sat::Queue::value_type id : result.rTransaction().autoInstalled() )
+	    newdata.insert( IdString(id) );
+	  _autoInstalledFile.setData( newdata );
+        }
+        // hard locks
+        if ( ZConfig::instance().apply_locks_file() )
+        {
+          HardLocksFile::Data newdata;
+          pool_r.getHardLockQueries( newdata );
+          _hardLocksFile.setData( newdata );
+        }
+      }
+      else
+      {
+        DBG << "dryRun: Not stroring non-package data." << endl;
+      }
 
       ///////////////////////////////////////////////////////////////////
       // First collect and display all messages
@@ -1187,9 +1373,7 @@ namespace zypp
       if ( ! policy_r.dryRun() || policy_r.downloadMode() == DownloadOnly )
       {
 	// Prepare the package cache. Pass all items requiring download.
-        repo::RepoMediaAccess access;
-        RepoProvidePackage repoProvidePackage( access, pool_r );
-        CommitPackageCache packageCache( root() / "tmp", repoProvidePackage );
+        CommitPackageCache packageCache( root() );
 	packageCache.setCommitList( steps.begin(), steps.end() );
 
         bool miss = false;
@@ -1265,25 +1449,37 @@ namespace zypp
               }
             }
           }
+          packageCache.preloaded( true ); // try to avoid duplicate infoInCache CBs in commit
         }
 
         if ( miss )
         {
           ERR << "Some packages could not be provided. Aborting commit."<< endl;
         }
-        else if ( ! policy_r.dryRun() )
-        {
-          commit( policy_r, packageCache, result );
-        }
         else
-        {
-          DBG << "dryRun: Not installing/deleting anything." << endl;
-        }
+	{
+	  if ( ! policy_r.dryRun() )
+	  {
+	    // if cache is preloaded, check for file conflicts
+	    commitFindFileConflicts( policy_r, result );
+	    commit( policy_r, packageCache, result );
+	  }
+	  else
+	  {
+	    DBG << "dryRun/downloadOnly: Not installing/deleting anything." << endl;
+	  }
+	}
       }
       else
       {
         DBG << "dryRun: Not downloading/installing/deleting anything." << endl;
       }
+
+      ///////////////////////////////////////////////////////////////////
+      // Send result to commit plugins:
+      ///////////////////////////////////////////////////////////////////
+      if ( ! commitPlugins.empty() )
+	commitPlugins.send( transactionPluginFrame( "COMMITEND", steps ) );
 
       ///////////////////////////////////////////////////////////////////
       // Try to rebuild solv file while rpm database is still in cache
@@ -1292,48 +1488,6 @@ namespace zypp
       {
         buildCache();
       }
-
-      // for DEPRECATED old ZyppCommitResult results:
-      ///////////////////////////////////////////////////////////////////
-      // build return statistics
-      ///////////////////////////////////////////////////////////////////
-      result._errors.clear();
-      result._remaining.clear();
-      result._srcremaining.clear();
-      unsigned toInstall = 0;
-      for_( step, steps.begin(), steps.end() )
-      {
-	if ( step->stepType() == sat::Transaction::TRANSACTION_IGNORE )
-	{
-	  // For non-packages only products might have beed installed.
-	  // All the rest is ignored.
-	  if ( step->satSolvable().isSystem() || ! step->satSolvable().isKind<Product>() )
-	    continue;
-	}
-	else if ( step->stepType() == sat::Transaction::TRANSACTION_ERASE )
-	{
-	  continue;
-	}
-	// to be installed:
-	++toInstall;
-	switch ( step->stepStage() )
-	{
-	  case sat::Transaction::STEP_TODO:
-	    if ( step->satSolvable().isKind<Package>() )
-	      result._remaining.push_back( PoolItem( *step ) );
-	    else if ( step->satSolvable().isKind<SrcPackage>() )
-	      result._srcremaining.push_back( PoolItem( *step ) );
-	    break;
-	  case sat::Transaction::STEP_DONE:
-	    // NOOP
-	    break;
-	  case sat::Transaction::STEP_ERROR:
-	    result._errors.push_back( PoolItem( *step ) );
-	    break;
-	}
-      }
-      result._result = (toInstall - result._remaining.size());
-      ///////////////////////////////////////////////////////////////////
 
       MIL << "TargetImpl::commit(<pool>, " << policy_r << ") returns: " << result << endl;
       return result;
@@ -1353,6 +1507,7 @@ namespace zypp
       MIL << "TargetImpl::commit(<list>" << policy_r << ")" << steps.size() << endl;
 
       bool abort = false;
+      RpmPostTransCollector postTransCollector( _root );
       std::vector<sat::Solvable> successfullyInstalledPackages;
       TargetImpl::PoolItemList remaining;
 
@@ -1429,6 +1584,8 @@ namespace zypp
             try
             {
               progress.tryLevel( target::rpm::InstallResolvableReport::RPM_NODEPS_FORCE );
+	      if ( postTransCollector.collectScriptFromPackage( localfile ) )
+		flags |= rpm::RPMINST_NOPOSTTRANS;
 	      rpm().installPackage( localfile, flags );
               HistoryLog().install(citem);
 
@@ -1573,6 +1730,12 @@ namespace zypp
 
       } // for
 
+      // process all remembered posttrans scripts.
+      if ( !abort )
+	postTransCollector.executeScripts();
+      else
+	postTransCollector.discardScripts();
+
       // Check presence of update scripts/messages. If aborting,
       // at least log omitted scripts.
       if ( ! successfullyInstalledPackages.empty() )
@@ -1615,38 +1778,29 @@ namespace zypp
     }
 
     ///////////////////////////////////////////////////////////////////
-
-    Product::constPtr TargetImpl::baseProduct() const
-    {
-      ResPool pool(ResPool::instance());
-      for_( it, pool.byKindBegin<Product>(), pool.byKindEnd<Product>() )
-      {
-        Product::constPtr p = (*it)->asKind<Product>();
-        if ( p->isTargetDistribution() )
-          return p;
-      }
-      return 0L;
-    }
-
-    ///////////////////////////////////////////////////////////////////
-
     namespace
     {
       parser::ProductFileData baseproductdata( const Pathname & root_r )
       {
+	parser::ProductFileData ret;
         PathInfo baseproduct( Pathname::assertprefix( root_r, "/etc/products.d/baseproduct" ) );
+
         if ( baseproduct.isFile() )
         {
           try
           {
-            return parser::ProductFileReader::scanFile( baseproduct.path() );
+            ret = parser::ProductFileReader::scanFile( baseproduct.path() );
           }
           catch ( const Exception & excpt )
           {
             ZYPP_CAUGHT( excpt );
           }
         }
-        return parser::ProductFileData();
+	else if ( PathInfo( Pathname::assertprefix( root_r, "/etc/products.d" ) ).isDir() )
+	{
+	  ERR << "baseproduct symlink is dangling or missing: " << baseproduct << endl;
+	}
+        return ret;
       }
 
       inline Pathname staticGuessRoot( const Pathname & root_r )
@@ -1673,6 +1827,28 @@ namespace zypp
         }
         return std::string();
       }
+    } // namescpace
+    ///////////////////////////////////////////////////////////////////
+
+    Product::constPtr TargetImpl::baseProduct() const
+    {
+      ResPool pool(ResPool::instance());
+      for_( it, pool.byKindBegin<Product>(), pool.byKindEnd<Product>() )
+      {
+        Product::constPtr p = (*it)->asKind<Product>();
+        if ( p->isTargetDistribution() )
+          return p;
+      }
+      return nullptr;
+    }
+
+    LocaleSet TargetImpl::requestedLocales( const Pathname & root_r )
+    {
+      const Pathname needroot( staticGuessRoot(root_r) );
+      const Target_constPtr target( getZYpp()->getTarget() );
+      if ( target && target->root() == needroot )
+	return target->requestedLocales();
+      return RequestedLocalesFile( home(needroot) / "RequestedLocales" ).locales();
     }
 
     std::string TargetImpl::targetDistribution() const
@@ -1773,14 +1949,19 @@ namespace zypp
     void TargetImpl::installSrcPackage( const SrcPackage_constPtr & srcPackage_r )
     {
       // provide on local disk
-      repo::RepoMediaAccess access_r;
-      repo::SrcPackageProvider prov( access_r );
-      ManagedFile localfile = prov.provideSrcPackage( srcPackage_r );
+      ManagedFile localfile = provideSrcPackage(srcPackage_r);
       // install it
       rpm().installPackage ( localfile );
     }
 
-    /////////////////////////////////////////////////////////////////
+    ManagedFile TargetImpl::provideSrcPackage( const SrcPackage_constPtr & srcPackage_r )
+    {
+      // provide on local disk
+      repo::RepoMediaAccess access_r;
+      repo::SrcPackageProvider prov( access_r );
+      return prov.provideSrcPackage( srcPackage_r );
+    }
+    ////////////////////////////////////////////////////////////////
   } // namespace target
   ///////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////

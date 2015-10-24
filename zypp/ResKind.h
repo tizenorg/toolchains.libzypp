@@ -15,7 +15,7 @@
 #include <iosfwd>
 #include <string>
 
-#include "zypp/base/Deprecated.h"
+#include "zypp/APIConfig.h"
 #include "zypp/base/String.h"
 #include "zypp/IdStringType.h"
 
@@ -24,14 +24,11 @@ namespace zypp
 { /////////////////////////////////////////////////////////////////
 
   ///////////////////////////////////////////////////////////////////
-  //
-  //	CLASS NAME : ResKind
-  //
-  /** Resolvable kinds.
-   * A \b lowercased string and used as identification.
-   * Comparison against string values is always case
-   * insensitive.
-   */
+  /// \class ResKind
+  /// \brief Resolvable kinds.
+  /// A \b lowercased string and used as identification. Comparison
+  /// against string values is always case insensitive.
+  ///////////////////////////////////////////////////////////////////
   class ResKind : public IdStringType<ResKind>
   {
     public:
@@ -45,7 +42,21 @@ namespace zypp
       static const ResKind pattern;
       static const ResKind product;
       static const ResKind srcpackage;
+      static const ResKind application;
       //@}
+
+      /** Return the builtin kind if \a str_r explicitly prefixed.
+       * \a str_r must start with a builtin kind followed by a \c ':'.
+       * If no builtin kind is detected, \ref nokind is returned,
+       * which usually indicates a \ref package or \ref srcpackage.
+       */
+      static ResKind explicitBuiltin( const char * str_r );
+      /** \overload */
+      static ResKind explicitBuiltin( const std::string & str_r )
+      { return explicitBuiltin( str_r.c_str() ); }
+      /** \overload */
+      static ResKind explicitBuiltin( const IdString & str_r )
+      { return explicitBuiltin( str_r.c_str() ); }
 
     public:
       /** Default ctor: \ref nokind */
@@ -58,8 +69,8 @@ namespace zypp
       explicit ResKind( const char * cstr_r )       : _str( str::toLower(cstr_r) ) {}
 
     public:
-      /** Return the satsolver identifier for name.
-       * Libsatsolver combines the objects kind and name in a single
+      /** Return libsolv identifier for name.
+       * Libsolv combines the objects kind and name in a single
        * identifier \c "pattern:kde_multimedia", \b except for packages
        * and source packes. They are not prefixed by any kind string.
       */
@@ -80,6 +91,10 @@ namespace zypp
       friend class IdStringType<ResKind>;
       IdString _str;
   };
+
+  /** \relates ResKind XML output. */
+  inline std::ostream & dumpAsXmlOn( std::ostream & str, const ResKind & obj )
+  { return str << "<kind>" << obj <<  "</kind>"; }
 
   /////////////////////////////////////////////////////////////////
 } // namespace zypp

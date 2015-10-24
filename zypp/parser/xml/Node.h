@@ -14,8 +14,6 @@
 
 #include <iosfwd>
 
-#include "zypp/base/SafeBool.h"
-
 #include "zypp/parser/xml/XmlString.h"
 
 ///////////////////////////////////////////////////////////////////
@@ -34,7 +32,7 @@ namespace zypp
      * the readers position in the file. Mostly access to the
      * nodes attributes.
      **/
-    class Node : private base::SafeBool<Node>
+    class Node
     {
     public:
       /** Default ctor. */
@@ -43,8 +41,9 @@ namespace zypp
       /** Ctor referencing a \ref Reader. */
       Node( xmlTextReaderPtr const & reader_r );
 
-      /** Validate Node in a boolean context. \see \ref SafeBool. */
-      using base::SafeBool<Node>::operator bool_type;
+      /** Validate Node in a boolean context. */
+      explicit operator bool() const
+      { return _reader; }
 
     public:
       /** Provides the number of attributes of the current node. */
@@ -72,6 +71,9 @@ namespace zypp
       XmlString getAttribute( const char * name_r ) const
       { return XmlString( xmlTextReaderGetAttribute( _reader, reinterpret_cast<const xmlChar *>(name_r) ),
                           XmlString::FREE ); }
+      /** \overload */
+      XmlString getAttribute( const std::string & name_r ) const
+      { return getAttribute( name_r.c_str() ); }
 
       /** Provides a copy of the attribute value  with the specified
        * index relative to the containing element. */
@@ -158,11 +160,6 @@ namespace zypp
       static xmlTextReaderPtr const _no_reader;
       /** Reference to the \ref Reader. */
       xmlTextReaderPtr const & _reader;
-
-    private:
-      friend base::SafeBool<Node>::operator bool_type() const;
-      /** \ref SafeBool test. */
-      bool boolTest() const { return _reader; }
     };
     ///////////////////////////////////////////////////////////////////
 

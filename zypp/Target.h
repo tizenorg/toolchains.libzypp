@@ -17,7 +17,7 @@
 #include "zypp/base/ReferenceCounted.h"
 #include "zypp/base/NonCopyable.h"
 #include "zypp/base/PtrTypes.h"
-#include "zypp/base/Deprecated.h"
+#include "zypp/APIConfig.h"
 
 #include "zypp/Product.h"
 #include "zypp/Pathname.h"
@@ -70,6 +70,8 @@ namespace zypp
      */
     void load();
 
+    void reload();
+    
     /**
      * unload target resolvables from the
      * pool
@@ -119,13 +121,22 @@ namespace zypp
      */
     Product::constPtr baseProduct() const;
 
+    /**
+     * \brief Languages to be supported by the system.
+     * E.g. language specific packages to be installed.
+     */
+    LocaleSet requestedLocales() const;
+    /** \overload Use a specific root_r, if empty the default targets root, or '/'
+     */
+    static LocaleSet requestedLocales( const Pathname & root_r );
+
   public:
     /** \name Base product and registration.
      *
      * Static methods herein allow to retrieve the values without explicitly
      * initializing the \ref Target. They take a targets root directory as
      * argument. If an empty \ref Pathname is passed, an already existing
-     * Targets root is used, otherwise \c "\" is assumed.
+     * Targets root is used, otherwise \c "/" is assumed.
      */
     //@{
     /** This is \c register.target attribute of the installed base product.

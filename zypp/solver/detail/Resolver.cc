@@ -36,6 +36,7 @@
 #include "zypp/sat/Pool.h"
 #include "zypp/sat/Solvable.h"
 #include "zypp/sat/Transaction.h"
+#include "zypp/ResolverProblem.h"
 
 #define MAXSOLVERRUNS 5
 
@@ -89,7 +90,7 @@ Resolver::Resolver (const ResPool & pool)
     , _allowVendorChange	( ZConfig::instance().solver_allowVendorChange() )
     , _solveSrcPackages		( false )
     , _cleandepsOnRemove	( ZConfig::instance().solver_cleandepsOnRemove() )
-    , _ignoreAlreadyRecommended	( false )
+    , _ignoreAlreadyRecommended	( true )
 
 {
     sat::Pool satPool( sat::Pool::instance() );
@@ -137,6 +138,13 @@ void Resolver::reset( bool keepExtras )
     _installs.clear();
     _satifiedByInstalled.clear();
     _installedSatisfied.clear();
+}
+
+bool Resolver::doUpgrade()
+{
+  // Setting Resolver to upgrade mode. SAT solver will do the update
+  _upgradeMode = true;
+  return resolvePool();
 }
 
 void Resolver::doUpdate()
@@ -267,7 +275,7 @@ void Resolver::undo()
 
 void Resolver::solverInit()
 {
-    // Solving with the satsolver
+    // Solving with libsolv
     static bool poolDumped = false;
     MIL << "-------------- Calling SAT Solver -------------------" << endl;
     if ( getenv("ZYPP_FULLLOG") ) {
@@ -289,19 +297,14 @@ void Resolver::solverInit()
     _satResolver->setAllowuninstall		( forceResolve() );
     _satResolver->setUpdatesystem		(false);
     _satResolver->setNoupdateprovide		(false);
-    _satResolver->setDosplitprovides		(false);
+    _satResolver->setDosplitprovides		(true);
     _satResolver->setSolveSrcPackages		( solveSrcPackages() );
     _satResolver->setCleandepsOnRemove		( cleandepsOnRemove() );
 
+    _satResolver->setDistupgrade		(_upgradeMode);
     if (_upgradeMode) {
       // may overwrite some settings
-      _satResolver->setDistupgrade			(true);
       _satResolver->setDistupgrade_removeunsupported	(false);
-      _satResolver->setUpdatesystem			(true);
-      _satResolver->setAllowdowngrade			(true);
-      _satResolver->setAllowarchchange			(true);
-      _satResolver->setAllowvendorchange		(true);
-      _satResolver->setDosplitprovides			(true);
     }
 
     // Resetting additional solver information
@@ -357,11 +360,32 @@ bool Resolver::resolveQueue( solver::detail::SolverQueueItemList & queue )
 }
 
 sat::Transaction Resolver::getTransaction()
-{ return _satResolver->getTransaction(); }
+{
+  // FIXME: That's an ugly way of pushing autoInstalled into the transaction.
+  sat::Transaction ret( sat::Transaction::loadFromPool );
+  ret.autoInstalled( _satResolver->autoInstalled() );
+  return ret;
+}
+
 
 //----------------------------------------------------------------------------
 // Getting more information about the solve results
 
+ResolverProblemList Resolver::problems() const
+{
+  MIL << "Resolver::problems()" << endl;
+  return _satResolver->problems();
+}
+
+void Resolver::applySolutions( const ProblemSolutionList & solutions )
+{
+  for_( iter, solutions.begin(), solutions.end() )
+  {
+    ProblemSolution_Ptr solution = *iter;
+    if ( !solution->apply( *this ) )
+      break;
+  }
+}
 
 void Resolver::collectResolverInfo()
 {
